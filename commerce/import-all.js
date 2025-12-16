@@ -22,14 +22,14 @@ import { commerceApi, logger, resolveWebsiteId } from '../shared/commerce-api.js
 import { COMMERCE_CONFIG } from '../shared/config-loader.js';
 import { formatDuration } from '../shared/base-importer.js';
 import { format, withSpinner, updateLine, finishLine } from '../shared/format.js';
-import { importStores } from '../stores/import.js';
-import { importCustomerGroups } from '../customers/import-groups.js';
-import { importAttributes } from '../attributes/import.js';
-import { importCategories } from '../categories/import.js';
-import { importProducts } from '../products/import.js';
-import { importImages } from '../images/import.js';
-import { importCustomerAttributes } from '../attributes/import-customer-attributes.js';
-import { importCustomers } from '../customers/import.js';
+import { importStores } from './stores/import.js';
+import { importCustomerGroups } from './customers/import-groups.js';
+import { importAttributes } from './attributes/import.js';
+import { importCategories } from './categories/import.js';
+import { importProducts } from './products/import.js';
+import { importImages } from './images/import.js';
+import { importCustomerAttributes } from './attributes/import-customer-attributes.js';
+import { importCustomers } from './customers/import.js';
 import { getStateTracker } from '../shared/state-tracker.js';
 import { 
   runValidation,
