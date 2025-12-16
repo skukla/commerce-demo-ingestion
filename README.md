@@ -29,10 +29,15 @@ Adobe Commerce / ACO
 - Smart detection and deletion
 
 ### ACO Ingestion
-- Product catalog
-- Variants
+- Product catalog (simple products)
+- Product variants (configurable products)
 - Metadata and attributes
-- Bulk operations with progress tracking
+- Price books (hierarchical structure)
+- Prices (with volume tiers)
+- Idempotent imports with state tracking
+- Smart detection and deletion
+- Progress tracking with ETAs
+- Validation and orphan cleanup
 
 ## Quick Start
 
@@ -103,6 +108,13 @@ Import data to ACO:
 npm run import:aco
 ```
 
+This will import in order:
+1. Metadata (product attributes)
+2. Products (simple products)
+3. Variants (configurable products)
+4. Price books (hierarchical structure)
+5. Prices (with volume tiers)
+
 ### Delete from ACO
 
 Delete project data from ACO:
@@ -143,12 +155,23 @@ commerce-demo-ingestion/
 │       └── import.js           # Product images
 ├── aco/                        # ACO ingestion scripts
 │   ├── import.js               # ACO import orchestrator
-│   └── delete.js               # ACO delete orchestrator
+│   ├── delete.js               # ACO delete orchestrator
+│   ├── attributes/
+│   │   └── ingest-metadata.js  # Metadata ingestion
+│   ├── products/
+│   │   ├── ingest-products.js  # Simple products
+│   │   └── ingest-variants.js  # Configurable products
+│   └── prices/
+│       ├── ingest-price-books.js  # Price book hierarchy
+│       └── ingest-prices.js       # Price ingestion
 └── shared/                     # Shared utilities
-    ├── base-importer.js        # Base importer class
+    ├── base-importer.js        # Commerce base importer
+    ├── base-ingester.js        # ACO base ingester
     ├── commerce-api.js         # Commerce REST API client
+    ├── aco-client.js           # ACO REST API client
     ├── smart-detector.js       # Intelligent data detection
-    ├── state-tracker.js        # Import state management
+    ├── state-tracker.js        # Commerce state management
+    ├── aco-state-tracker.js    # ACO state management
     └── format.js               # CLI formatting utilities
 ```
 
