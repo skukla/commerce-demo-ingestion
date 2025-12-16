@@ -1,0 +1,26 @@
+{
+  "name": "commerce-demo-ingestion",
+  "version": "1.0.0",
+  "description": "Generic ingestion scripts for Adobe Commerce and ACO demo projects",
+  "type": "module",
+  "imports": {
+    "#shared/*": "./shared/*.js",
+    "#config/*": "./config/*.js"
+  },
+  "scripts": {
+    "import:commerce": "node commerce/import-all.js",
+    "delete:commerce": "node commerce/delete-all.js --all --yes",
+    "import:aco": "node aco/import.js",
+    "delete:aco": "node aco/delete.js"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "cli-progress": "^3.12.0",
+    "dotenv": "^16.3.1",
+    "ora": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+
