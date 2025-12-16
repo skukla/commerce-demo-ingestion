@@ -12,13 +12,13 @@ import { dirname, resolve } from 'path';
 import { readFileSync } from 'fs';
 import { BaseImporter, ProgressTracker } from '../../shared/base-importer.js';
 import { getStateTracker } from '../../shared/state-tracker.js';
+import { DATA_REPO_PATH } from '../../shared/config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Path to committed datapack attributes file
-const DATA_REPO = process.env.DATA_REPO_PATH || resolve(__dirname, '../../../buildright-data');
-const DATAPACK_ATTRIBUTES_PATH = resolve(DATA_REPO, 'generated/commerce/data/accs/accs_product_attributes.json');
+const DATAPACK_ATTRIBUTES_PATH = resolve(DATA_REPO_PATH, 'generated/commerce/data/accs/accs_product_attributes.json');
 
 class AttributeImporter extends BaseImporter {
   constructor(options = {}) {

@@ -10,7 +10,6 @@ import { config } from 'dotenv';
 // Load .env from project root
 config({ path: resolve(process.cwd(), '.env') });
 
-// Validate DATA_REPO_PATH is set (required, no fallbacks for generic design)
 const DATA_REPO_PATH = process.env.DATA_REPO_PATH;
 if (!DATA_REPO_PATH) {
   throw new Error('DATA_REPO_PATH environment variable is required. Please set it in your .env file.');

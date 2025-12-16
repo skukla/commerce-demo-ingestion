@@ -513,8 +513,9 @@ async function deleteProjectStores() {
   try {
     // 1. Delete store views first
     const storeViews = await commerceApi.getStoreViews();
+    const projectViewCode = COMMERCE_CONFIG.storeViewCode;
     const projectViews = storeViews.filter(v => 
-      v.code?.includes('buildright') || v.name?.includes('BuildRight')
+      v.code === projectViewCode || v.code?.includes(projectViewCode)
     );
     
     for (const view of projectViews) {
@@ -533,8 +534,9 @@ async function deleteProjectStores() {
     
     // 2. Delete store groups
     const storeGroups = await commerceApi.getStoreGroups();
+    const projectStoreCode = COMMERCE_CONFIG.storeCode;
     const projectGroups = storeGroups.filter(g => 
-      g.code?.includes('buildright') || g.name?.includes('BuildRight')
+      g.code === projectStoreCode || g.code?.includes(projectStoreCode)
     );
     
     for (const group of projectGroups) {
@@ -553,8 +555,9 @@ async function deleteProjectStores() {
     
     // 3. Delete websites
     const websites = await commerceApi.getWebsites();
+    const projectWebsiteCode = COMMERCE_CONFIG.websiteCode;
     const projectWebsites = websites.filter(w => 
-      w.code?.includes('buildright') || w.name?.includes('BuildRight')
+      w.code === projectWebsiteCode || w.code?.includes(projectWebsiteCode)
     );
     
     for (const website of projectWebsites) {

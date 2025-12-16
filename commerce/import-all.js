@@ -18,8 +18,9 @@
 
 import ora from 'ora';
 import chalk from 'chalk';
+import { resolve } from 'path';
 import { commerceApi, logger, resolveWebsiteId } from '../shared/commerce-api.js';
-import { COMMERCE_CONFIG } from '../shared/config-loader.js';
+import { COMMERCE_CONFIG, DATA_REPO_PATH } from '../shared/config-loader.js';
 import { formatDuration } from '../shared/base-importer.js';
 import { format, withSpinner, updateLine, finishLine } from '../shared/format.js';
 import { importStores } from './stores/import.js';
@@ -162,11 +163,12 @@ async function importAll() {
   console.log('');
   
   // Pre-import validation
+  const datapackPath = resolve(DATA_REPO_PATH, 'generated/commerce/data/accs');
   const preValidation = await withSpinner('Pre-import validation...', async () => {
     return await runValidation('Pre-Import Validation', [
-      checkDatapackExists('./output/buildright-datapack/data/accs/accs_products.json'),
-      checkProductCount('./output/buildright-datapack/data/accs/accs_products.json', 1, 500),
-      checkAttributeDefinitions('./output/buildright-datapack/data/accs/accs_product_attributes.json'),
+      checkDatapackExists(resolve(datapackPath, 'accs_products.json')),
+      checkProductCount(resolve(datapackPath, 'accs_products.json'), 1, 500),
+      checkAttributeDefinitions(resolve(datapackPath, 'accs_product_attributes.json')),
       checkCommerceConnectivity(commerceApi)
     ], { stopOnFailure: true, silent: true });
   });
