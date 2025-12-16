@@ -42,7 +42,7 @@ const skipProducts = args.includes('--skip-products');
 const skipValidation = args.includes('--skip-validation');
 
 /**
- * Smart BuildRight detector
+ * Smart project detector
  * Replaces hardcoded lists with intelligent pattern matching
  */
 const detector = new BuildRightDetector({ silent: true });
@@ -65,11 +65,11 @@ async function resetAll() {
   };
   
   try {
-    // Use smart detection to find all BuildRight entities
+    // Use smart detection to find all project entities
     const { updateLine, finishLine} = await import('../shared/progress.js');
     
     // Find data (single line) - Use state tracker as source of truth
-    updateLine('🔍 Finding BuildRight data...');
+    updateLine('🔍 Finding project data...');
     
     // Get ALL SKUs from state tracker (records exactly what was ingested)
     // This includes both visible products AND invisible variants (visibleIn: [])
@@ -90,7 +90,7 @@ async function resetAll() {
     const priceBookIds = priceBooks.map(pb => pb.priceBookId);
     
     if (skus.length > 0 || priceBookIds.length > 0) {
-      updateLine(chalk.green(`✔ Finding BuildRight data (${skus.length} products, ${priceBookIds.length} price books)`));
+      updateLine(chalk.green(`✔ Finding project data (${skus.length} products, ${priceBookIds.length} price books)`));
       finishLine();
     } else {
       // State tracker is empty - check for orphaned visible products
