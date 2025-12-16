@@ -7,9 +7,9 @@
  * Uses BaseImporter for standardized patterns
  */
 
-import { BaseImporter } from '#shared/base-importer';
-import { CATEGORY_TREE, COMMERCE_CONFIG } from '#config/commerce-config';
-import { getStateTracker } from '#shared/state-tracker';
+import { BaseImporter } from '../../shared/base-importer.js';
+import { CATEGORY_TREE, COMMERCE_CONFIG } from '../../shared/config-loader.js';
+import { getStateTracker } from '../../shared/state-tracker.js';
 
 class CategoryImporter extends BaseImporter {
   constructor(options = {}) {

@@ -4,7 +4,7 @@
  */
 
 import { commerceApi, logger } from './commerce-api.js';
-import { COMMERCE_CONFIG } from '#config/commerce-config';
+import { COMMERCE_CONFIG } from './config-loader.js';
 
 /**
  * Standard result structure for all importers

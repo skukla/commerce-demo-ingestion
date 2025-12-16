@@ -1,0 +1,79 @@
+/**
+ * Config Loader
+ * Loads project configuration from data repository
+ */
+
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { config } from 'dotenv';
+
+// Load .env from project root
+config({ path: resolve(process.cwd(), '.env') });
+
+// Determine data repo path
+const DATA_REPO = process.env.DATA_REPO_PATH || '../buildright-data';
+const DEFINITIONS_PATH = resolve(DATA_REPO, 'definitions');
+
+/**
+ * Load project configuration from data repository
+ */
+function loadProjectConfig() {
+  const projectJsonPath = resolve(DEFINITIONS_PATH, 'project.json');
+  try {
+    const projectJson = JSON.parse(readFileSync(projectJsonPath, 'utf-8'));
+    return projectJson;
+  } catch (error) {
+    console.error(`Failed to load project configuration from ${projectJsonPath}`);
+    console.error(`Error: ${error.message}`);
+    console.error(`\nMake sure DATA_REPO_PATH is set correctly in your .env file.`);
+    throw error;
+  }
+}
+
+/**
+ * Load JSON file from definitions
+ */
+function loadDefinition(filename) {
+  const filePath = resolve(DEFINITIONS_PATH, filename);
+  try {
+    return JSON.parse(readFileSync(filePath, 'utf-8'));
+  } catch (error) {
+    console.error(`Failed to load ${filename} from ${filePath}`);
+    console.error(`Error: ${error.message}`);
+    return null;
+  }
+}
+
+// Load and export project configuration
+export const PROJECT_CONFIG = loadProjectConfig();
+
+// Load data definitions
+export const CATEGORY_TREE = loadDefinition('categories/category-tree.json');
+export const PRODUCT_ATTRIBUTES = loadDefinition('attributes/product-attributes.json');
+export const CUSTOMER_ATTRIBUTES = loadDefinition('attributes/customer-attributes.json');
+export const CUSTOMER_GROUPS = loadDefinition('customers/customer-groups.json');
+export const DEMO_CUSTOMERS = loadDefinition('customers/demo-customers.json');
+
+// Export convenience values
+export const COMMERCE_CONFIG = {
+  project: PROJECT_CONFIG,
+  
+  // Store structure
+  websiteCode: PROJECT_CONFIG.websiteCode,
+  storeCode: PROJECT_CONFIG.storeCode,
+  storeViewCode: PROJECT_CONFIG.storeViewCode,
+  
+  // Attribute prefixes
+  attributePrefix: PROJECT_CONFIG.attributePrefix,
+  customerAttributePrefix: PROJECT_CONFIG.customerAttributePrefix,
+  
+  // Category
+  ROOT_CATEGORY_NAME: PROJECT_CONFIG.rootCategoryName,
+  
+  // Data paths (relative to data repo)
+  dataPaths: {
+    commerce: resolve(DATA_REPO, 'generated/commerce'),
+    aco: resolve(DATA_REPO, 'generated/aco')
+  }
+};
+

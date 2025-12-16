@@ -18,10 +18,10 @@
 
 import ora from 'ora';
 import chalk from 'chalk';
-import { commerceApi, logger, resolveWebsiteId } from '#shared/commerce-api';
-import { COMMERCE_CONFIG } from '#config/commerce-config';
-import { formatDuration } from '#shared/base-importer';
-import { format, withSpinner, updateLine, finishLine } from '#shared/format';
+import { commerceApi, logger, resolveWebsiteId } from '../shared/commerce-api.js';
+import { COMMERCE_CONFIG } from '../shared/config-loader.js';
+import { formatDuration } from '../shared/base-importer.js';
+import { format, withSpinner, updateLine, finishLine } from '../shared/format.js';
 import { importStores } from '../stores/import.js';
 import { importCustomerGroups } from '../customers/import-groups.js';
 import { importAttributes } from '../attributes/import.js';
@@ -30,7 +30,7 @@ import { importProducts } from '../products/import.js';
 import { importImages } from '../images/import.js';
 import { importCustomerAttributes } from '../attributes/import-customer-attributes.js';
 import { importCustomers } from '../customers/import.js';
-import { getStateTracker } from '#shared/state-tracker';
+import { getStateTracker } from '../shared/state-tracker.js';
 import { 
   runValidation,
   checkDatapackExists,
@@ -39,7 +39,7 @@ import {
   checkCommerceConnectivity,
   checkCommerceProductCount,
   checkStateConsistency
-} from '#shared/validation-checkpoint';
+} from '../shared/validation-checkpoint.js';
 
 // Parse command line arguments
 const args = process.argv.slice(2);

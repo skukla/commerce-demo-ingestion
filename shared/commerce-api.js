@@ -3,7 +3,7 @@
  * Handles authentication and API requests to Adobe Commerce
  */
 
-import { COMMERCE_CONFIG } from '#config/commerce-config';
+import { COMMERCE_CONFIG } from './config-loader.js';
 
 /**
  * Logger utility

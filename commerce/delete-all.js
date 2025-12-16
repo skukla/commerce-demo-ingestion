@@ -25,12 +25,12 @@
  */
 
 import chalk from 'chalk';
-import { commerceApi, logger } from '#shared/commerce-api';
-import { COMMERCE_CONFIG } from '#config/commerce-config';
-import { formatDuration, BaseImporter } from '#shared/base-importer';
-import { getStateTracker } from '#shared/state-tracker';
-import SmartDetector from '#shared/smart-detector';
-import { format, withSpinner, updateLine, finishLine } from '#shared/format';
+import { commerceApi, logger } from '../shared/commerce-api.js';
+import { COMMERCE_CONFIG } from '../shared/config-loader.js';
+import { formatDuration, BaseImporter } from '../shared/base-importer.js';
+import { getStateTracker } from '../shared/state-tracker.js';
+import SmartDetector from '../shared/smart-detector.js';
+import { format, withSpinner, updateLine, finishLine } from '../shared/format.js';
 
 const DEFAULT_CONCURRENCY = 5;
 const ATTRIBUTE_CONCURRENCY = 10;
@@ -255,7 +255,7 @@ async function deleteProjectCategories() {
  */
 async function findProjectCustomers() {
   try {
-    const { DEMO_CUSTOMERS } = await import('#config/commerce-config');
+    const { DEMO_CUSTOMERS } = await import('../shared/config-loader.js');
     const demoEmails = new Set(DEMO_CUSTOMERS.map(c => c.email.toLowerCase()));
     
     logger.debug(`Looking for ${demoEmails.size} demo customer emails`);

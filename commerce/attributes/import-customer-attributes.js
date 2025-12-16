@@ -11,8 +11,8 @@
  * This aligns with Adobe's recommended pattern: Commerce as source of truth for persona mapping
  */
 
-import { BaseImporter } from '#shared/base-importer';
-import { CUSTOMER_ATTRIBUTES } from '#config/commerce-config';
+import { BaseImporter } from '../../shared/base-importer.js';
+import { CUSTOMER_ATTRIBUTES } from '../../shared/config-loader.js';
 
 class CustomerAttributeImporter extends BaseImporter {
   constructor(options = {}) {

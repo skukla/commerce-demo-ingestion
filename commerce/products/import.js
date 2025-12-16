@@ -15,17 +15,18 @@
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import { existsSync, readFileSync } from 'fs';
-import { BaseImporter } from '#shared/base-importer';
-import { COMMERCE_CONFIG } from '#config/commerce-config';
-import { createBulkApi } from '#shared/bulk-commerce-api';
-import { getStateTracker } from '#shared/state-tracker';
-import { withRetry } from '#shared/retry-util';
+import { BaseImporter } from '../../shared/base-importer.js';
+import { COMMERCE_CONFIG } from '../../shared/config-loader.js';
+import { createBulkApi } from '../../shared/bulk-commerce-api.js';
+import { getStateTracker } from '../../shared/state-tracker.js';
+import { withRetry } from '../../shared/retry-util.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Path to generated datapack products file
-const DATAPACK_PRODUCTS_PATH = resolve(__dirname, '../output/buildright-datapack/data/accs/accs_products.json');
+const DATA_REPO = process.env.DATA_REPO_PATH || resolve(__dirname, '../../../buildright-data');
+const DATAPACK_PRODUCTS_PATH = resolve(DATA_REPO, 'generated/commerce/data/accs/accs_products.json');
 
 // Default concurrency for parallel processing
 // Reduced from 15 to 5 to prevent race conditions and orphaned products

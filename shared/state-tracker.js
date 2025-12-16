@@ -14,9 +14,9 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { logger } from './commerce-api.js';
-import { COMMERCE_CONFIG } from '#config/commerce-config';
+import { PROJECT_CONFIG } from './config-loader.js';
 
-const STATE_DIR = join(process.cwd(), `.${COMMERCE_CONFIG.project.identifier}-state`);
+const STATE_DIR = join(process.cwd(), `.${PROJECT_CONFIG.identifier}-state`);
 const STATE_FILE = join(STATE_DIR, 'import-state.json');
 
 /**

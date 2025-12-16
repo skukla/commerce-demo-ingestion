@@ -10,13 +10,14 @@
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import { readFileSync, readdirSync, existsSync } from 'fs';
-import { BaseImporter } from '#shared/base-importer';
+import { BaseImporter } from '../../shared/base-importer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Path to generated datapack
-const DATAPACK_PATH = resolve(__dirname, '../output/buildright-datapack/data/accs');
+const DATA_REPO = process.env.DATA_REPO_PATH || resolve(__dirname, '../../../buildright-data');
+const DATAPACK_PATH = resolve(DATA_REPO, 'generated/commerce/data/accs');
 
 class ImageImporter extends BaseImporter {
   constructor(options = {}) {

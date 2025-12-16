@@ -7,7 +7,7 @@
  */
 
 import { commerceApi, logger } from './commerce-api.js';
-import { COMMERCE_CONFIG } from '#config/commerce-config';
+import { COMMERCE_CONFIG } from './config-loader.js';
 
 /**
  * Smart detection strategies for project-specific data

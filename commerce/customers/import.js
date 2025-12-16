@@ -10,13 +10,14 @@
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import { readFileSync } from 'fs';
-import { BaseImporter } from '#shared/base-importer';
+import { BaseImporter } from '../../shared/base-importer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Path to committed datapack customers file
-const DATAPACK_CUSTOMERS_PATH = resolve(__dirname, '../output/buildright-datapack/data/accs/accs_customers.json');
+const DATA_REPO = process.env.DATA_REPO_PATH || resolve(__dirname, '../../../buildright-data');
+const DATAPACK_CUSTOMERS_PATH = resolve(DATA_REPO, 'generated/commerce/data/accs/accs_customers.json');
 
 class CustomerImporter extends BaseImporter {
   constructor(options = {}) {
