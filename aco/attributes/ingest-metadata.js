@@ -22,6 +22,7 @@ import { fileURLToPath } from 'url';
 import { BaseIngester } from '../../shared/base-ingester.js';
 import { withRetry } from '../../shared/retry-util.js';
 import { getStateTracker } from '../../shared/aco-state-tracker.js';
+import { loadJSON, createBatches, processBatches } from '../../shared/aco-helpers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -144,13 +145,7 @@ class MetadataIngester extends BaseIngester {
   
   async ingest() {
     // Load metadata JSON
-    const metadataPath = path.join(DATA_REPO, 'generated/aco/metadata.json');
-    this.logger.info(`Loading metadata from: ${metadataPath}`);
-    
-    const metadataRaw = await fs.readFile(metadataPath, 'utf-8');
-    const metadata = JSON.parse(metadataRaw);
-    
-    this.logger.info(`Loaded ${metadata.length} attribute definitions`);
+    const metadata = await loadJSON('metadata.json', DATA_REPO, 'attribute definitions');
     
     // Validate metadata
     this.logger.info('Validating metadata structure...');
@@ -211,10 +206,7 @@ class MetadataIngester extends BaseIngester {
     const client = await this.getClient();
     
     // Ingest in batches
-    const batches = [];
-    for (let i = 0; i < toIngest.length; i += this.batchSize) {
-      batches.push(toIngest.slice(i, i + this.batchSize));
-    }
+    const batches = createBatches(toIngest, this.batchSize);
     
     this.logger.info(`Ingesting ${toIngest.length} metadata definitions in ${batches.length} batches...`);
     

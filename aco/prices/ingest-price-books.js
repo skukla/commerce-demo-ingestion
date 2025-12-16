@@ -19,6 +19,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { BaseIngester } from '../../shared/base-ingester.js';
 import { withRetry } from '../../shared/retry-util.js';
+import { loadJSON } from '../../shared/aco-helpers.js';
 import { getStateTracker } from '../../shared/aco-state-tracker.js';
 import logger from '../../shared/logger.js';
 
@@ -99,13 +100,7 @@ class PriceBookIngester extends BaseIngester {
   
   async ingest() {
     // Load price books
-    const priceBookPath = join(DATA_REPO, 'generated/aco/price-books.json');
-    this.logger.info(`Loading price books from: ${priceBookPath}`);
-    
-    const priceBookData = await fs.readFile(priceBookPath, 'utf-8');
-    const priceBooks = JSON.parse(priceBookData);
-    
-    this.logger.info(`Loaded ${priceBooks.length} price books`);
+    const priceBooks = await loadJSON('price-books.json', DATA_REPO, 'price books');
     
     // Sort by hierarchy
     const sorted = sortByHierarchy(priceBooks);

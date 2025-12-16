@@ -23,6 +23,7 @@ import { withRetry } from '../../shared/retry-util.js';
 import { getStateTracker } from '../../shared/aco-state-tracker.js';
 import BuildRightDetector from '../../shared/smart-detector.js';
 import { PollingProgress } from '../../shared/progress.js';
+import { loadJSON, validateItems } from '../../shared/aco-helpers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -59,13 +60,7 @@ class VariantIngester extends BaseIngester {
   
   async ingest() {
     // Load variants
-    const variantsPath = join(DATA_REPO, 'generated/aco/variants.json');
-    this.logger.info(`Loading variants from: ${variantsPath}`);
-    
-    const variantsData = await fs.readFile(variantsPath, 'utf-8');
-    const variants = JSON.parse(variantsData);
-    
-    this.logger.info(`Loaded ${variants.length} variants`);
+    const variants = await loadJSON('variants.json', DATA_REPO, 'variants');
     
     // Separate parents from children
     const parents = variants.filter(v =>
@@ -84,19 +79,12 @@ class VariantIngester extends BaseIngester {
     
     // Validate variants
     this.logger.info('Validating variant structure...');
-    let hasErrors = false;
-    variants.forEach((variant, index) => {
-      const errors = validateVariant(variant);
-      if (errors.length > 0) {
-        this.logger.error(`Variant ${index} (${variant.sku || 'NO_SKU'}): ${errors.join(', ')}`);
-        hasErrors = true;
-      }
-    });
-    
-    if (hasErrors) {
-      throw new Error('Variant validation failed');
-    }
-    
+    validateItems(
+      variants,
+      validateVariant,
+      (v) => v.sku || 'NO_SKU',
+      'variant'
+    );
     this.logger.info('✅ Validation passed');
     
     if (this.isDryRun) {

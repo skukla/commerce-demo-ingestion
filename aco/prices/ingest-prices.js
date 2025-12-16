@@ -19,6 +19,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { BaseIngester } from '../../shared/base-ingester.js';
 import { withRetry } from '../../shared/retry-util.js';
+import { loadJSON, validateItems, createBatches } from '../../shared/aco-helpers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -62,13 +63,7 @@ class PriceIngester extends BaseIngester {
   
   async ingest() {
     // Load prices
-    const pricesPath = join(DATA_REPO, 'generated/aco/prices.json');
-    this.logger.info(`Loading prices from: ${pricesPath}`);
-    
-    const pricesData = await fs.readFile(pricesPath, 'utf-8');
-    const prices = JSON.parse(pricesData);
-    
-    this.logger.info(`Loaded ${prices.length} prices`);
+    const prices = await loadJSON('prices.json', DATA_REPO, 'prices');
     
     // Validate prices (unless skipped)
     if (!this.skipValidation) {
@@ -104,10 +99,7 @@ class PriceIngester extends BaseIngester {
     const client = await this.getClient();
     
     // Create batches
-    const batches = [];
-    for (let i = 0; i < prices.length; i += this.batchSize) {
-      batches.push(prices.slice(i, i + this.batchSize));
-    }
+    const batches = createBatches(prices, this.batchSize);
     
     // Ingest with retry
     for (let i = 0; i < batches.length; i++) {

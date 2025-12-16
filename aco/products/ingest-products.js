@@ -20,6 +20,7 @@ import { withRetry } from '../../shared/retry-util.js';
 import { getStateTracker } from '../../shared/aco-state-tracker.js';
 import BuildRightDetector from '../../shared/smart-detector.js';
 import { PollingProgress } from '../../shared/progress.js';
+import { loadJSON, validateItems } from '../../shared/aco-helpers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -56,29 +57,16 @@ class ProductIngester extends BaseIngester {
   
   async ingest() {
     // Load products
-    const productsPath = join(DATA_REPO, 'generated/aco/products.json');
-    this.logger.info(`Loading products from: ${productsPath}`);
-    
-    const productsData = await fs.readFile(productsPath, 'utf-8');
-    const products = JSON.parse(productsData);
-    
-    this.logger.info(`Loaded ${products.length} products`);
+    const products = await loadJSON('products.json', DATA_REPO, 'products');
     
     // Validate products
     this.logger.info('Validating product structure...');
-    let hasErrors = false;
-    products.forEach((product, index) => {
-      const errors = validateProduct(product);
-      if (errors.length > 0) {
-        this.logger.error(`Product ${index} (${product.sku || 'NO_SKU'}): ${errors.join(', ')}`);
-        hasErrors = true;
-      }
-    });
-    
-    if (hasErrors) {
-      throw new Error('Product validation failed');
-    }
-    
+    validateItems(
+      products,
+      validateProduct,
+      (p) => p.sku || 'NO_SKU',
+      'product'
+    );
     this.logger.info('✅ Validation passed');
     
     if (this.isDryRun) {
