@@ -214,18 +214,18 @@ async function resetAll() {
         
         // 2. Query for any unknown visible orphans
         const unknownOrphans = await detector.queryACOProductsDirect('', 500);
-        const buildRightUnknowns = unknownOrphans.filter(p => 
+        const patternMatchedOrphans = unknownOrphans.filter(p => 
           p.sku.match(/^(LBR|DOOR|WINDOW|ROOF|DRYWALL|PLY|NAIL|SCREW|STUD)-/)
         );
         
         // Combine and dedupe
         const allOrphanSkus = [...new Set([
           ...knownOrphans.map(p => p.sku),
-          ...buildRightUnknowns.map(p => p.sku)
+          ...patternMatchedOrphans.map(p => p.sku)
         ])];
         
         if (allOrphanSkus.length > 0) {
-          console.log(`  Deleting ${allOrphanSkus.length} orphaned products (${knownOrphans.length} expected, ${buildRightUnknowns.length} unknown)...`);
+          console.log(`  Deleting ${allOrphanSkus.length} orphaned products (${knownOrphans.length} expected, ${patternMatchedOrphans.length} unknown)...`);
           await deleteProductsBySKUs(allOrphanSkus, { dryRun, silent: true });
           
           // Poll for cleanup completion

@@ -31,7 +31,7 @@ const __dirname = path.dirname(__filename);
 const BATCH_SIZE = 10; // ACO recommendation
 
 /**
- * Maps BuildRight metadata types to ACO metadata dataTypes
+ * Maps metadata types to ACO metadata dataTypes
  */
 const DATA_TYPE_MAP = {
   text: 'TEXT',
@@ -80,7 +80,7 @@ function getSearchWeight(attr) {
 }
 
 /**
- * Transform BuildRight metadata to ACO Metadata API format
+ * Transform metadata to ACO Metadata API format
  */
 function transformToACOMetadata(metadata) {
   return metadata.map(attr => ({
