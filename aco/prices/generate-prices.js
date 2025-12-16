@@ -30,6 +30,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const logger = createLogger('generate-prices-simple');
 
+// Data repository path (required)
+const DATA_REPO = process.env.DATA_REPO_PATH;
+if (!DATA_REPO) {
+  throw new Error('DATA_REPO_PATH environment variable is required. Please set it in your .env file.');
+}
+
 /**
  * Price book tier discounts (applied to base price)
  */
@@ -189,7 +195,7 @@ export function generatePricesSimple(products, priceBooks, randomSeed = 12345) {
  */
 async function main() {
   try {
-    const dataDir = path.join(__dirname, '../../output/buildright');
+    const dataDir = path.join(DATA_REPO, 'generated/aco');
 
     // Load products
     logger.info('Loading products...');

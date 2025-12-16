@@ -23,6 +23,12 @@ import { withRetry } from '../../shared/retry-util.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Data repository path (required)
+const DATA_REPO = process.env.DATA_REPO_PATH;
+if (!DATA_REPO) {
+  throw new Error('DATA_REPO_PATH environment variable is required. Please set it in your .env file.');
+}
+
 const BATCH_SIZE = 100;
 
 /**
@@ -56,7 +62,7 @@ class PriceIngester extends BaseIngester {
   
   async ingest() {
     // Load prices
-    const pricesPath = join(__dirname, '../../output/buildright/prices.json');
+    const pricesPath = join(DATA_REPO, 'generated/aco/prices.json');
     this.logger.info(`Loading prices from: ${pricesPath}`);
     
     const pricesData = await fs.readFile(pricesPath, 'utf-8');

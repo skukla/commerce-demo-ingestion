@@ -26,6 +26,12 @@ import { getStateTracker } from '../../shared/aco-state-tracker.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Data repository path (required)
+const DATA_REPO = process.env.DATA_REPO_PATH;
+if (!DATA_REPO) {
+  throw new Error('DATA_REPO_PATH environment variable is required. Please set it in your .env file.');
+}
+
 const BATCH_SIZE = 10; // ACO recommendation
 
 /**
@@ -138,7 +144,7 @@ class MetadataIngester extends BaseIngester {
   
   async ingest() {
     // Load metadata JSON
-    const metadataPath = path.join(__dirname, '../../output/buildright/metadata.json');
+    const metadataPath = path.join(DATA_REPO, 'generated/aco/metadata.json');
     this.logger.info(`Loading metadata from: ${metadataPath}`);
     
     const metadataRaw = await fs.readFile(metadataPath, 'utf-8');

@@ -25,6 +25,12 @@ import logger from '../../shared/logger.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Data repository path (required)
+const DATA_REPO = process.env.DATA_REPO_PATH;
+if (!DATA_REPO) {
+  throw new Error('DATA_REPO_PATH environment variable is required. Please set it in your .env file.');
+}
+
 /**
  * Sort price books by hierarchy level (parents before children)
  */
@@ -93,7 +99,7 @@ class PriceBookIngester extends BaseIngester {
   
   async ingest() {
     // Load price books
-    const priceBookPath = join(__dirname, '../../output/buildright/price-books.json');
+    const priceBookPath = join(DATA_REPO, 'generated/aco/price-books.json');
     this.logger.info(`Loading price books from: ${priceBookPath}`);
     
     const priceBookData = await fs.readFile(priceBookPath, 'utf-8');

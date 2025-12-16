@@ -27,6 +27,12 @@ import { PollingProgress } from '../../shared/progress.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Data repository path (required)
+const DATA_REPO = process.env.DATA_REPO_PATH;
+if (!DATA_REPO) {
+  throw new Error('DATA_REPO_PATH environment variable is required. Please set it in your .env file.');
+}
+
 /**
  * Validate variant structure
  */
@@ -53,7 +59,7 @@ class VariantIngester extends BaseIngester {
   
   async ingest() {
     // Load variants
-    const variantsPath = join(__dirname, '../../output/buildright/variants.json');
+    const variantsPath = join(DATA_REPO, 'generated/aco/variants.json');
     this.logger.info(`Loading variants from: ${variantsPath}`);
     
     const variantsData = await fs.readFile(variantsPath, 'utf-8');

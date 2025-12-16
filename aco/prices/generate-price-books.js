@@ -21,6 +21,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const logger = createLogger('generate-price-books');
 
+// Data repository path (required)
+const DATA_REPO = process.env.DATA_REPO_PATH;
+if (!DATA_REPO) {
+  throw new Error('DATA_REPO_PATH environment variable is required. Please set it in your .env file.');
+}
+
 /**
  * Price book structure configuration
  * @constant {Object}
@@ -231,12 +237,12 @@ async function main() {
     });
 
     // Ensure output directory exists
-    const outputDir = path.join(process.cwd(), 'output/buildright');
+    const outputDir = path.join(DATA_REPO, 'generated/aco');
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
       logger.info(`Created output directory: ${outputDir}`);
     }
-
+    
     // Write to file
     const outputPath = path.join(outputDir, 'price-books.json');
     fs.writeFileSync(outputPath, JSON.stringify(priceBooks, null, 2));

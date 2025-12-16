@@ -24,6 +24,12 @@ import { PollingProgress } from '../../shared/progress.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Data repository path (required)
+const DATA_REPO = process.env.DATA_REPO_PATH;
+if (!DATA_REPO) {
+  throw new Error('DATA_REPO_PATH environment variable is required. Please set it in your .env file.');
+}
+
 /**
  * Validate product structure
  */
@@ -50,7 +56,7 @@ class ProductIngester extends BaseIngester {
   
   async ingest() {
     // Load products
-    const productsPath = join(__dirname, '../../output/buildright/products.json');
+    const productsPath = join(DATA_REPO, 'generated/aco/products.json');
     this.logger.info(`Loading products from: ${productsPath}`);
     
     const productsData = await fs.readFile(productsPath, 'utf-8');
