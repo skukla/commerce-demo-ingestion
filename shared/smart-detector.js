@@ -530,3 +530,6 @@ export class SmartDetector {
 
 export default SmartDetector;
 
+// Backward compatibility alias for ACO scripts
+export { SmartDetector as BuildRightDetector };
+

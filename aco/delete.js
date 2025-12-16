@@ -22,15 +22,15 @@
  * @module scripts/reset-all
  */
 
-import { BuildRightDetector } from '#shared/smart-detector';
+import { BuildRightDetector } from '../shared/smart-detector.js';
 import {
   deleteAllPricesForPriceBooks,
   deletePriceBooks,
   deleteProductsBySKUs
-} from '#shared/aco-delete';
-import logger from '#shared/logger';
-import { format, withProgress } from '#shared/format';
-import { updateLine, finishLine } from '#shared/progress';
+} from '../shared/aco-delete.js';
+import logger from '../shared/logger.js';
+import { format, withProgress } from '../shared/format.js';
+import { updateLine, finishLine } from '../shared/progress.js';
 import chalk from 'chalk';
 
 // Parse command line arguments
@@ -66,7 +66,7 @@ async function resetAll() {
   
   try {
     // Use smart detection to find all BuildRight entities
-    const { updateLine, finishLine } = await import('#shared/progress');
+    const { updateLine, finishLine} = await import('../shared/progress.js');
     
     // Find data (single line) - Use state tracker as source of truth
     updateLine('🔍 Finding BuildRight data...');
@@ -74,7 +74,7 @@ async function resetAll() {
     // Get ALL SKUs from state tracker (records exactly what was ingested)
     // This includes both visible products AND invisible variants (visibleIn: [])
     // Note: We can't query ACO for invisible variants, but we can delete them by SKU
-    const { getStateTracker } = await import('#shared/aco-state-tracker');
+    const { getStateTracker } = await import('../shared/aco-state-tracker.js');
     
     const stateTracker = getStateTracker();
     await stateTracker.load();
@@ -129,7 +129,7 @@ async function resetAll() {
       
       // Poll to watch actual deletion progress
       if (!dryRun) {
-        const { PollingProgress } = await import('#shared/progress');
+        const { PollingProgress } = await import('../shared/progress.js');
         const progress = new PollingProgress('Deleting products', skus.length);
         
         const maxAttempts = 60; // 10 minutes max
@@ -229,7 +229,7 @@ async function resetAll() {
           await deleteProductsBySKUs(allOrphanSkus, { dryRun, silent: true });
           
           // Poll for cleanup completion
-          const { PollingProgress } = await import('#shared/progress');
+          const { PollingProgress } = await import('../shared/progress.js');
           const progress = new PollingProgress('Cleaning up orphans', allOrphanSkus.length);
           
           let attempt = 0;
@@ -279,7 +279,7 @@ async function resetAll() {
       }
       
       // Clear state tracker after successful deletion
-      const { getStateTracker } = await import('#shared/aco-state-tracker');
+      const { getStateTracker } = await import('../shared/aco-state-tracker.js');
       const stateTracker = getStateTracker();
       await stateTracker.load();
       stateTracker.clearAll();
