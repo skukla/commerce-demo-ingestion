@@ -20,15 +20,10 @@ import { dirname, join } from 'path';
 import { BaseIngester } from '../../shared/base-ingester.js';
 import { withRetry } from '../../shared/retry-util.js';
 import { loadJSON, validateItems, createBatches } from '../../shared/aco-helpers.js';
+import { DATA_REPO_PATH as DATA_REPO } from '../../shared/config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-// Data repository path (required)
-const DATA_REPO = process.env.DATA_REPO_PATH;
-if (!DATA_REPO) {
-  throw new Error('DATA_REPO_PATH environment variable is required. Please set it in your .env file.');
-}
 
 const BATCH_SIZE = 100;
 

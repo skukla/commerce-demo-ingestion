@@ -19,15 +19,10 @@ import logger from '../../shared/logger.js';
 import { promises as fs } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { DATA_REPO_PATH as DATA_REPO } from '../../shared/config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-// Data repository path (required)
-const DATA_REPO = process.env.DATA_REPO_PATH;
-if (!DATA_REPO) {
-  throw new Error('DATA_REPO_PATH environment variable is required. Please set it in your .env file.');
-}
 
 // Parse command line arguments
 const args = process.argv.slice(2);

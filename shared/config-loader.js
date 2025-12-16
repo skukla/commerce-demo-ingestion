@@ -10,8 +10,13 @@ import { config } from 'dotenv';
 // Load .env from project root
 config({ path: resolve(process.cwd(), '.env') });
 
-// Determine data repo path
-const DATA_REPO = process.env.DATA_REPO_PATH || '../buildright-data';
+// Validate DATA_REPO_PATH is set (required, no fallbacks for generic design)
+const DATA_REPO_PATH = process.env.DATA_REPO_PATH;
+if (!DATA_REPO_PATH) {
+  throw new Error('DATA_REPO_PATH environment variable is required. Please set it in your .env file.');
+}
+
+const DATA_REPO = DATA_REPO_PATH;
 const DEFINITIONS_PATH = resolve(DATA_REPO, 'definitions');
 
 /**
@@ -43,6 +48,9 @@ function loadDefinition(filename) {
     return null;
   }
 }
+
+// Export validated DATA_REPO_PATH for use by all scripts
+export { DATA_REPO_PATH };
 
 // Load and export project configuration
 export const PROJECT_CONFIG = loadProjectConfig();

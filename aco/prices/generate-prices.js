@@ -25,16 +25,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createLogger } from '../../shared/logger.js';
 import { SeededRandom } from '../../shared/random-seed.js';
+import { DATA_REPO_PATH as DATA_REPO } from '../../shared/config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const logger = createLogger('generate-prices-simple');
-
-// Data repository path (required)
-const DATA_REPO = process.env.DATA_REPO_PATH;
-if (!DATA_REPO) {
-  throw new Error('DATA_REPO_PATH environment variable is required. Please set it in your .env file.');
-}
 
 /**
  * Price book tier discounts (applied to base price)

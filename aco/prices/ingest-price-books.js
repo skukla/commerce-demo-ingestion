@@ -22,15 +22,10 @@ import { withRetry } from '../../shared/retry-util.js';
 import { loadJSON } from '../../shared/aco-helpers.js';
 import { getStateTracker } from '../../shared/aco-state-tracker.js';
 import logger from '../../shared/logger.js';
+import { DATA_REPO_PATH as DATA_REPO } from '../../shared/config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-// Data repository path (required)
-const DATA_REPO = process.env.DATA_REPO_PATH;
-if (!DATA_REPO) {
-  throw new Error('DATA_REPO_PATH environment variable is required. Please set it in your .env file.');
-}
 
 /**
  * Sort price books by hierarchy level (parents before children)
