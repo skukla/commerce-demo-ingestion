@@ -1,5 +1,11 @@
 <img src="https://r2cdn.perplexity.ai/pplx-full-logo-primary-dark%402x.png" style="height:64px;margin-right:32px"/>
 
+> **⚠️ SCHEMA UPDATE (December 2024)**
+> 
+> The ACO Category schema has been updated in v1.0.0 of the Data Ingestion API. The fields `code`, `description`, `active`, and `parentId` are **no longer supported**. Hierarchy is now represented via the `slug` field using a path format (e.g., `"parent/child/grandchild"`).
+> 
+> See the [JSON Payload Example](#json-payload-example) section below for the updated schema.
+
 ## Summary
 
 Based on current Adobe Commerce Optimizer documentation, here's what I found:
@@ -147,31 +153,45 @@ Categories are ingested as a distinct resource using the Data Ingestion API. Unl
 
 #### JSON Payload Example
 
-Based on the API schema, a category payload looks like this. You typically send an array of category objects:
+**⚠️ UPDATED SCHEMA (v1.0.0 - December 2024)**
+
+Based on the current ACO Data Ingestion API OpenAPI schema, a category payload looks like this:
 
 ```json
 [
   {
-    "code": "mens-clothing",
+    "slug": "men",
     "source": { "locale": "en-US" },
-    "name": "Men's Clothing",
-    "slug": "mens",
-    "description": "All men's clothing items",
-    "parentId": "root-category-code", 
-    "active": true
+    "name": "Men's Clothing"
   },
   {
-    "code": "mens-shirts",
+    "slug": "men/shirts",
     "source": { "locale": "en-US" },
-    "name": "Shirts",
-    "slug": "mens/shirts",
-    "parentId": "mens-clothing",
-    "active": true
+    "name": "Shirts"
+  },
+  {
+    "slug": "men/shirts/casual",
+    "source": { "locale": "en-US" },
+    "name": "Casual Shirts"
   }
 ]
 ```
 
-> **Note:** The `parentId` or `slug` path is crucial for establishing the tree structure.
+**Required Fields:**
+- `slug` (string) - Hierarchical path using forward slashes (e.g., "parent/child/grandchild")
+- `source` (object) - Must contain `locale` (e.g., "en-US")
+- `name` (string) - Display name for the category
+
+**Optional Fields:**
+- `families` (array of strings) - Product family identifiers for enhanced organization
+
+**❌ REMOVED from Schema (No Longer Supported):**
+- `code` - Use `slug` instead
+- `description` - Not supported in v1.0.0
+- `active` - Not supported in v1.0.0
+- `parentId` - Hierarchy is now represented via the `slug` path
+
+> **Note:** The `slug` path is crucial for establishing the tree structure. Parent-child relationships are defined by the hierarchical path format (e.g., "men/clothing/pants").
 
 ### 2. Does the SDK Provide Tools?
 
