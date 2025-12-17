@@ -6,8 +6,9 @@
  * Configurable patterns - no hardcoded project names
  */
 
-import { commerceApi, logger } from './commerce-api.js';
-import { COMMERCE_CONFIG, CUSTOMER_GROUPS } from './config-loader.js';
+import { commerceApi } from '../../commerce/lib/commerce-api.js';
+import logger from '../../shared/logger.js';
+import { COMMERCE_CONFIG, CUSTOMER_GROUPS } from '../../shared/config-loader.js';
 
 /**
  * Smart detection strategies for project-specific data

@@ -17,10 +17,10 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { BaseIngester } from '../../shared/base-ingester.js';
 import { withRetry } from '../../shared/retry-util.js';
-import { getStateTracker } from '../../shared/aco-state-tracker.js';
-import { SmartDetector } from '../../shared/smart-detector.js';
+import { getStateTracker } from '../lib/aco-state-tracker.js';
+import { SmartDetector } from '../lib/smart-detector.js';
 import { PollingProgress } from '../../shared/progress.js';
-import { loadJSON, validateItems } from '../../shared/aco-helpers.js';
+import { loadJSON, validateItems } from '../lib/aco-helpers.js';
 import { DATA_REPO_PATH as DATA_REPO } from '../../shared/config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);

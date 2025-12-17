@@ -23,13 +23,13 @@
  * @module scripts/reset-all
  */
 
-import { SmartDetector } from '../shared/smart-detector.js';
+import { SmartDetector } from './lib/smart-detector.js';
 import {
   deleteAllPricesForPriceBooks,
   deletePriceBooks,
   deleteProductsBySKUs,
   deleteMetadata
-} from '../shared/aco-delete.js';
+} from './lib/aco-delete.js';
 import logger from '../shared/logger.js';
 import { format, withProgress } from '../shared/format.js';
 import { updateLine, finishLine } from '../shared/progress.js';

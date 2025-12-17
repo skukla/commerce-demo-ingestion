@@ -19,19 +19,19 @@
 import ora from 'ora';
 import chalk from 'chalk';
 import { resolve } from 'path';
-import { commerceApi, logger, resolveWebsiteId } from '../shared/commerce-api.js';
+import { commerceApi, logger, resolveWebsiteId } from './lib/commerce-api.js';
 import { COMMERCE_CONFIG, DATA_REPO_PATH } from '../shared/config-loader.js';
 import { formatDuration } from '../shared/base-importer.js';
 import { format, withSpinner, updateLine, finishLine } from '../shared/format.js';
-import { importStores } from './stores/import.js';
-import { importCustomerGroups } from './customers/import-groups.js';
-import { importAttributes } from './attributes/import.js';
-import { importCategories } from './categories/import.js';
-import { importProducts } from './products/import.js';
-import { importImages } from './images/import.js';
-import { importCustomerAttributes } from './attributes/import-customer-attributes.js';
-import { importCustomers } from './customers/import.js';
-import { getStateTracker } from '../shared/state-tracker.js';
+import { importStores } from './importers/stores.js';
+import { importCustomerGroups } from './importers/customer-groups.js';
+import { importAttributes } from './importers/attributes.js';
+import { importCategories } from './importers/categories.js';
+import { importProducts } from './importers/products.js';
+import { importImages } from './importers/images.js';
+import { importCustomerAttributes } from './importers/customer-attributes.js';
+import { importCustomers } from './importers/customers.js';
+import { getStateTracker } from './lib/state-tracker.js';
 import { 
   runValidation,
   checkDatapackExists,

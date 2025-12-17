@@ -17,8 +17,8 @@ import { dirname, resolve } from 'path';
 import { existsSync, readFileSync } from 'fs';
 import { BaseImporter } from '../../shared/base-importer.js';
 import { COMMERCE_CONFIG, DATA_REPO_PATH } from '../../shared/config-loader.js';
-import { createBulkApi } from '../../shared/bulk-commerce-api.js';
-import { getStateTracker } from '../../shared/state-tracker.js';
+import { createBulkApi } from '../lib/bulk-commerce-api.js';
+import { getStateTracker } from '../lib/state-tracker.js';
 import { withRetry } from '../../shared/retry-util.js';
 
 const __filename = fileURLToPath(import.meta.url);

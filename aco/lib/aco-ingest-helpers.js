@@ -9,7 +9,7 @@
  */
 
 import cliProgress from 'cli-progress';
-import logger from './logger.js';
+import logger from '../../shared/logger.js';
 
 /**
  * Format duration in seconds to human-readable format

@@ -21,8 +21,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { BaseIngester } from '../../shared/base-ingester.js';
 import { withRetry } from '../../shared/retry-util.js';
-import { getStateTracker } from '../../shared/aco-state-tracker.js';
-import { loadJSON, createBatches, processBatches } from '../../shared/aco-helpers.js';
+import { getStateTracker } from '../lib/aco-state-tracker.js';
+import { loadJSON, createBatches, processBatches } from '../lib/aco-helpers.js';
 import { DATA_REPO_PATH as DATA_REPO } from '../../shared/config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);

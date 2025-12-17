@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import { readFileSync } from 'fs';
 import { BaseImporter, ProgressTracker } from '../../shared/base-importer.js';
-import { getStateTracker } from '../../shared/state-tracker.js';
+import { getStateTracker } from '../lib/state-tracker.js';
 import { DATA_REPO_PATH } from '../../shared/config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);

@@ -19,7 +19,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { BaseIngester } from '../../shared/base-ingester.js';
 import { withRetry } from '../../shared/retry-util.js';
-import { loadJSON, validateItems, createBatches } from '../../shared/aco-helpers.js';
+import { loadJSON, validateItems, createBatches } from '../lib/aco-helpers.js';
 import { DATA_REPO_PATH as DATA_REPO } from '../../shared/config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);

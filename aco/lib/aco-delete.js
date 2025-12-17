@@ -8,7 +8,7 @@
  */
 
 import { getACOClient } from './aco-client.js';
-import logger from './logger.js';
+import logger from '../../shared/logger.js';
 
 /**
  * Delete prices by SKUs and price book IDs

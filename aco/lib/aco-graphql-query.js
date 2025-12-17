@@ -8,8 +8,8 @@
  */
 
 import axios from 'axios';
-import { getAccessToken } from './oauth-token-manager.js';
-import logger from './logger.js';
+import { getAccessToken } from '../../shared/oauth-token-manager.js';
+import logger from '../../shared/logger.js';
 import { promises as fs } from 'fs';
 
 /**

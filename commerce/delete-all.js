@@ -25,11 +25,11 @@
  */
 
 import chalk from 'chalk';
-import { commerceApi, logger } from '../shared/commerce-api.js';
+import { commerceApi, logger } from './lib/commerce-api.js';
 import { COMMERCE_CONFIG } from '../shared/config-loader.js';
 import { formatDuration, BaseImporter } from '../shared/base-importer.js';
-import { getStateTracker } from '../shared/state-tracker.js';
-import SmartDetector from '../shared/smart-detector.js';
+import { getStateTracker } from './lib/state-tracker.js';
+import SmartDetector from '../aco/lib/smart-detector.js';
 import { format, withSpinner, updateLine, finishLine } from '../shared/format.js';
 
 const DEFAULT_CONCURRENCY = 5;

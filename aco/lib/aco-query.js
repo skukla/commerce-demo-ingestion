@@ -8,8 +8,8 @@
  * @module utils/aco-query
  */
 
-import { queryProductsBySKU, queryProducts } from './graphql-query.js';
-import logger from './logger.js';
+import { queryProductsBySKU, queryProducts } from './aco-graphql-query.js';
+import logger from '../../shared/logger.js';
 
 /**
  * Get all product SKUs from local data files

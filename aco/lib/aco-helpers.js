@@ -5,7 +5,7 @@
 
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import logger from './logger.js';
+import logger from '../../shared/logger.js';
 
 /**
  * Load JSON file from data repository

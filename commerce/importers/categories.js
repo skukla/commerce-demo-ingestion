@@ -9,7 +9,7 @@
 
 import { BaseImporter } from '../../shared/base-importer.js';
 import { CATEGORY_TREE, COMMERCE_CONFIG } from '../../shared/config-loader.js';
-import { getStateTracker } from '../../shared/state-tracker.js';
+import { getStateTracker } from '../lib/state-tracker.js';
 
 class CategoryImporter extends BaseImporter {
   constructor(options = {}) {

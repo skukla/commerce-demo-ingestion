@@ -6,16 +6,16 @@
 
 import { updateLine, finishLine } from '../shared/progress.js';
 import { format } from '../shared/format.js';
-import { formatDuration } from '../shared/aco-ingest-helpers.js';
+import { formatDuration } from './lib/aco-ingest-helpers.js';
 import chalk from 'chalk';
 
 // Import ingestion functions
-import { ingestMetadata } from './attributes/ingest-metadata.js';
-import { ingestProducts } from './products/ingest-products.js';
-import { ingestVariants } from './products/ingest-variants.js';
-import { ingestPriceBooks } from './prices/ingest-price-books.js';
-import { ingestPrices } from './prices/ingest-prices.js';
-import { getStateTracker } from '../shared/aco-state-tracker.js';
+import { ingestMetadata } from './importers/metadata.js';
+import { ingestProducts } from './importers/products.js';
+import { ingestVariants } from './importers/variants.js';
+import { ingestPriceBooks } from './importers/price-books.js';
+import { ingestPrices } from './importers/prices.js';
+import { getStateTracker } from './lib/aco-state-tracker.js';
 
 // Parse command line arguments
 const args = process.argv.slice(2);
