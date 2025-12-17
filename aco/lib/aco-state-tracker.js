@@ -32,6 +32,7 @@ const STATE_FILE = path.join(STATE_DIR, 'aco-ingest-state.json');
 class ACOStateTracker {
   constructor() {
     this.state = {
+      categories: new Set(), // All category codes
       products: new Set(), // All product SKUs (simple + variants)
       metadata: new Set(),
       priceBooks: new Set(),
@@ -50,6 +51,7 @@ class ACOStateTracker {
       const data = await fs.readFile(STATE_FILE, 'utf-8');
       const parsed = JSON.parse(data);
       
+      this.state.categories = new Set(parsed.categories || []);
       this.state.products = new Set(parsed.products || []);
       this.state.metadata = new Set(parsed.metadata || []);
       this.state.priceBooks = new Set(parsed.priceBooks || []);
@@ -65,7 +67,7 @@ class ACOStateTracker {
       this.state.lastUpdated = parsed.lastUpdated;
       this.loaded = true;
       
-      logger.debug(`Loaded ACO state: ${this.state.products.size} products`);
+      logger.debug(`Loaded ACO state: ${this.state.categories.size} categories, ${this.state.products.size} products`);
     } catch (error) {
       if (error.code === 'ENOENT') {
         logger.debug('No existing ACO state file found (first run)');
@@ -86,6 +88,7 @@ class ACOStateTracker {
       
       // Convert Sets/Maps to serializable format
       const serializable = {
+        categories: Array.from(this.state.categories),
         products: Array.from(this.state.products),
         metadata: Array.from(this.state.metadata),
         priceBooks: Array.from(this.state.priceBooks),
@@ -101,8 +104,8 @@ class ACOStateTracker {
       await fs.writeFile(STATE_FILE, JSON.stringify(serializable, null, 2));
       
       // Always log state saves (not just debug) so we can verify it's working
-      if (this.state.products.size > 0 || this.state.metadata.size > 0 || this.state.priceBooks.size > 0) {
-        logger.debug(`💾 Saved state: ${this.state.products.size} products, ${this.state.metadata.size} metadata, ${this.state.priceBooks.size} price books`);
+      if (this.state.categories.size > 0 || this.state.products.size > 0 || this.state.metadata.size > 0 || this.state.priceBooks.size > 0) {
+        logger.debug(`💾 Saved state: ${this.state.categories.size} categories, ${this.state.products.size} products, ${this.state.metadata.size} metadata, ${this.state.priceBooks.size} price books`);
       } else {
         logger.debug('Saved empty ACO state');
       }
@@ -110,6 +113,23 @@ class ACOStateTracker {
       logger.error('Failed to save ACO state:', error.message);
       throw error; // Re-throw so caller knows state wasn't saved
     }
+  }
+
+  // Category methods
+  addCategory(code) {
+    this.state.categories.add(code);
+  }
+
+  hasCategory(code) {
+    return this.state.categories.has(code);
+  }
+
+  getCategoryCount() {
+    return this.state.categories.size;
+  }
+
+  getAllCategoryCodes() {
+    return Array.from(this.state.categories);
   }
 
   // Product methods
@@ -191,6 +211,7 @@ class ACOStateTracker {
    * Clear all state
    */
   clearAll() {
+    this.state.categories.clear();
     this.state.products.clear();
     this.state.metadata.clear();
     this.state.priceBooks.clear();

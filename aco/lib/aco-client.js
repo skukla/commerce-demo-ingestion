@@ -198,6 +198,70 @@ export function getACOUIUrl() {
 }
 
 /**
+ * Creates categories in ACO
+ * 
+ * Note: The ACO SDK may not have a native createCategories method.
+ * This function provides a wrapper that will use the SDK method if available,
+ * otherwise it will construct the API call directly.
+ * 
+ * According to ACO Data Ingestion API documentation:
+ * - Endpoint: POST /v1/catalog/categories
+ * - Accepts array of category objects
+ * - Supports hierarchical structure via parentId references
+ * 
+ * @param {Array} categories - Array of category objects
+ * @returns {Promise<Object>} API response
+ * @throws {Error} If the API call fails
+ * 
+ * @example
+ * import { createCategories } from './aco-client.js';
+ * 
+ * const categories = [{
+ *   code: 'building-materials',
+ *   source: { locale: 'en-US' },
+ *   name: 'Building Materials',
+ *   slug: 'building-materials',
+ *   description: 'All building materials',
+ *   active: true
+ * }];
+ * 
+ * const response = await createCategories(categories);
+ */
+export async function createCategories(categories) {
+  const client = getACOClient();
+  
+  // Check if SDK has native createCategories method
+  if (typeof client.createCategories === 'function') {
+    logger.debug('Using SDK native createCategories method');
+    return await client.createCategories(categories);
+  }
+  
+  // Check if SDK exposes raw HTTP methods (post/request)
+  if (typeof client.post === 'function') {
+    logger.debug('Using SDK post method for categories');
+    return await client.post('/v1/catalog/categories', categories);
+  }
+  
+  // If SDK has a generic request method
+  if (typeof client.request === 'function') {
+    logger.debug('Using SDK request method for categories');
+    return await client.request({
+      method: 'POST',
+      url: '/v1/catalog/categories',
+      data: categories
+    });
+  }
+  
+  // Fallback error - SDK doesn't support the required methods
+  logger.error('ACO SDK does not support category creation methods');
+  throw new Error(
+    'ACO SDK does not support category creation. ' +
+    'Available methods: ' + Object.keys(client).join(', ') + '. ' +
+    'Please check the SDK version (@adobe-commerce/aco-ts-sdk) or use the Data Ingestion API directly.'
+  );
+}
+
+/**
  * Batch processor wrapper for ACO operations
  *
  * Handles automatic batching according to ACO API limits:

@@ -10,6 +10,7 @@ import { formatDuration } from './lib/aco-ingest-helpers.js';
 import chalk from 'chalk';
 
 // Import ingestion functions
+import { ingestCategories } from './importers/categories.js';
 import { ingestMetadata } from './importers/metadata.js';
 import { ingestProducts } from './importers/products.js';
 import { ingestVariants } from './importers/variants.js';
@@ -87,7 +88,15 @@ async function ingestAll() {
   const results = {};
   
   try {
-    // Step 1: Metadata
+    // Step 1: Categories (must be before products since products reference them)
+    results.categories = await executeIngestionStep('categories', ingestCategories, { context: {} });
+    if (!results.categories.success) {
+      console.log('');
+      console.log(format.error('Category ingestion failed - aborting workflow'));
+      return { success: false, results };
+    }
+    
+    // Step 2: Metadata
     results.metadata = await executeIngestionStep('metadata', ingestMetadata, { context: {} });
     if (!results.metadata.success) {
       console.log('');
@@ -95,7 +104,7 @@ async function ingestAll() {
       return { success: false, results };
     }
     
-    // Step 2: Products
+    // Step 3: Products
     results.products = await executeIngestionStep('products', ingestProducts, { context: {} });
     if (!results.products.success) {
       console.log('');
@@ -103,13 +112,13 @@ async function ingestAll() {
       return { success: false, results };
     }
     
-    // Step 3: Variants
+    // Step 4: Variants
     results.variants = await executeIngestionStep('variants', ingestVariants, { context: {} });
     
-    // Step 4: Price Books
+    // Step 5: Price Books
     results.priceBooks = await executeIngestionStep('price books', ingestPriceBooks, { context: {} });
     
-    // Step 5: Prices
+    // Step 6: Prices
     if (results.priceBooks.success) {
       results.prices = await executeIngestionStep('prices', ingestPrices, { context: { skipValidation: true } });
     }
