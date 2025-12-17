@@ -12,15 +12,17 @@
  */
 
 import { promises as fs } from 'fs';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import logger from './logger.js';
+import { PROJECT_CONFIG } from './config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const STATE_DIR = path.join(__dirname, '..', '.buildright-state');
+// Use project identifier from config for multi-project support
+const STATE_DIR = join(process.cwd(), `.${PROJECT_CONFIG.identifier}-state`);
 const STATE_FILE = path.join(STATE_DIR, 'aco-ingest-state.json');
 
 /**
