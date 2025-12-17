@@ -3,7 +3,8 @@
  * Provides common patterns and utilities for all Commerce import scripts
  */
 
-import { commerceApi, logger } from './commerce-api.js';
+import { commerceApi } from '../commerce/lib/commerce-api.js';
+import logger from './logger.js';
 import { COMMERCE_CONFIG } from './config-loader.js';
 
 /**

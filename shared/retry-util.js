@@ -10,7 +10,7 @@
  * - Transient error detection
  */
 
-import { logger } from './commerce-api.js';
+import logger from './logger.js';
 
 /**
  * Default retry configuration

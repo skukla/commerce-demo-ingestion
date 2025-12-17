@@ -5,8 +5,8 @@
  * Simple validation functions for pre/post import checks
  */
 
-import { logger } from './commerce-api.js';
-import { getStateTracker } from './state-tracker.js';
+import logger from './logger.js';
+import { getStateTracker } from '../commerce/lib/state-tracker.js';
 
 /**
  * Run a set of validation checks

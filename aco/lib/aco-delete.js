@@ -59,7 +59,7 @@ export async function deletePricesBySKUs(skus, priceBookIds, options = {}) {
   const client = getACOClient();
   
   // Import progress utility for single-line updates
-  const { updateLine, finishLine, formatProgressBar } = await import('./progress.js');
+  const { updateLine, finishLine, formatProgressBar } = await import('../../shared/progress.js');
   
   logger.debug(`Deleting ${priceDeletes.length} prices across ${Math.ceil(priceDeletes.length / batchSize)} batches...`);
   
@@ -165,7 +165,7 @@ export async function deletePriceBooks(priceBookIds, options = {}) {
   const priceBookDeletes = priceBookIds.map(priceBookId => ({ priceBookId }));
   
   // Import progress utility for single-line updates
-  const { updateLine, finishLine, formatProgressBar } = await import('./progress.js');
+  const { updateLine, finishLine, formatProgressBar } = await import('../../shared/progress.js');
   
   logger.debug(`Deleting ${priceBookDeletes.length} price books across ${Math.ceil(priceBookDeletes.length / batchSize)} batches...`);
   
@@ -240,7 +240,7 @@ export async function deleteProductsBySKUs(skus, options = {}) {
   }));
   
   // Import progress utility for single-line updates
-  const { updateLine, finishLine, formatProgressBar } = await import('./progress.js');
+  const { updateLine, finishLine, formatProgressBar } = await import('../../shared/progress.js');
   
   logger.debug(`Deleting ${productDeletes.length} products across ${Math.ceil(productDeletes.length / batchSize)} batches...`);
   

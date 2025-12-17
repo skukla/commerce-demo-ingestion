@@ -5,8 +5,8 @@
  */
 
 import logger from './logger.js';
-import { formatDuration } from './aco-ingest-helpers.js';
-import { getACOClient } from './aco-client.js';
+import { formatDuration } from '../aco/lib/aco-ingest-helpers.js';
+import { getACOClient } from '../aco/lib/aco-client.js';
 import { withRetry } from './retry-util.js';
 
 /**

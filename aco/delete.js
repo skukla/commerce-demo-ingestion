@@ -75,7 +75,7 @@ async function resetAll() {
     // Get ALL SKUs from state tracker (records exactly what was ingested)
     // This includes both visible products AND invisible variants (visibleIn: [])
     // Note: We can't query ACO for invisible variants, but we can delete them by SKU
-    const { getStateTracker } = await import('../shared/aco-state-tracker.js');
+    const { getStateTracker } = await import('./lib/aco-state-tracker.js');
     
     const stateTracker = getStateTracker();
     await stateTracker.load();
