@@ -31,15 +31,15 @@ export function formatProgressBar(current, total, options = {}) {
 
 /**
  * Update a single line in the terminal (no newline)
- * Uses carriage return for smooth, flicker-free updates
+ * Uses ANSI escape codes to clear and rewrite the line
  * @param {string} message - Message to display
  */
 export function updateLine(message) {
   if (process.stdout.isTTY) {
-    // Use carriage return to move cursor to start of line without clearing
-    // Pad the message to ensure we overwrite any previous longer text
-    const paddedMessage = message.padEnd(100);
-    process.stdout.write(`\r${paddedMessage}`);
+    // Clear the entire line and move cursor to start, then write new message
+    // \r = carriage return (move to start)
+    // \x1b[K = ANSI escape code to clear from cursor to end of line
+    process.stdout.write(`\r\x1b[K${message}`);
   } else {
     // Non-TTY: just print the message normally
     console.log(message);
