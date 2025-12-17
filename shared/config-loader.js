@@ -77,10 +77,35 @@ export const COMMERCE_CONFIG = {
   // Category
   ROOT_CATEGORY_NAME: PROJECT_CONFIG.rootCategoryName,
   
+  // Commerce API Configuration (from .env)
+  baseUrl: process.env.COMMERCE_BASE_URL,
+  adminUsername: process.env.COMMERCE_ADMIN_USERNAME,
+  adminPassword: process.env.COMMERCE_ADMIN_PASSWORD,
+  adminToken: process.env.COMMERCE_ADMIN_TOKEN, // Optional: if provided, skips token generation
+  verbose: process.env.VERBOSE === 'true' || process.env.COMMERCE_DEBUG === 'true',
+  
+  // API paths
+  api: {
+    version: 'V1',
+    paths: {
+      adminToken: '/integration/admin/token'
+    }
+  },
+  
   // Data paths (relative to data repo)
   dataPaths: {
     commerce: resolve(DATA_REPO, 'generated/commerce'),
     aco: resolve(DATA_REPO, 'generated/aco')
+  },
+  
+  // ACO API Configuration (from .env)
+  aco: {
+    tenantId: process.env.ACO_TENANT_ID,
+    region: process.env.ACO_REGION || 'na1',
+    environment: process.env.ACO_ENVIRONMENT || 'sandbox',
+    clientId: process.env.ACO_CLIENT_ID,
+    clientSecret: process.env.ACO_CLIENT_SECRET,
+    timeoutMs: parseInt(process.env.ACO_TIMEOUT_MS || '10000', 10)
   }
 };
 

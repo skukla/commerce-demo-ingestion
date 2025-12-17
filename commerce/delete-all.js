@@ -626,7 +626,7 @@ async function performDeletion(detector, options) {
   if (deleteCustomers) {
     results.customers = await deleteProjectCustomers();
     if (!silent && results.customers.deleted > 0) {
-      finishLine(chalk.green(`✔ Deleted ${results.customers.deleted} demo customers`));
+      console.log(chalk.green(`✔ Deleted ${results.customers.deleted} demo customers`));
     }
   }
   
@@ -634,7 +634,7 @@ async function performDeletion(detector, options) {
   if (deleteCustomerAttrs) {
     results.customerAttributes = await deleteProjectCustomerAttributes();
     if (!silent && results.customerAttributes.deleted > 0) {
-      finishLine(chalk.green(`✔ Deleted ${results.customerAttributes.deleted} customer attributes`));
+      console.log(chalk.green(`✔ Deleted ${results.customerAttributes.deleted} customer attributes`));
     }
   }
   
@@ -642,7 +642,7 @@ async function performDeletion(detector, options) {
   if (skus.length > 0) {
     results.products = await deleteProducts(skus);
     if (!silent && results.products.deleted > 0) {
-      finishLine(chalk.green(`✔ Deleted ${results.products.deleted} products`));
+      console.log(chalk.green(`✔ Deleted ${results.products.deleted} products`));
       
       // Small delay to let Commerce's search index catch up
       // Note: We cannot programmatically trigger reindexing via API, so we must wait
@@ -655,7 +655,7 @@ async function performDeletion(detector, options) {
   if (deleteCategories) {
     results.categories = await deleteProjectCategories();
     if (!silent && results.categories.deleted > 0) {
-      finishLine(chalk.green(`✔ Deleted ${results.categories.deleted} categories`));
+      console.log(chalk.green(`✔ Deleted ${results.categories.deleted} categories`));
     }
   }
   
@@ -663,7 +663,7 @@ async function performDeletion(detector, options) {
   if (deleteAttributes) {
     results.attributes = await deleteProjectProductAttributes();
     if (!silent && results.attributes.deleted > 0) {
-      finishLine(chalk.green(`✔ Deleted ${results.attributes.deleted} product attributes`));
+      console.log(chalk.green(`✔ Deleted ${results.attributes.deleted} product attributes`));
     }
   }
   
@@ -671,7 +671,7 @@ async function performDeletion(detector, options) {
   if (deleteCustomerGroups) {
     results.customerGroups = await deleteProjectCustomerGroups();
     if (!silent && results.customerGroups.deleted > 0) {
-      finishLine(chalk.green(`✔ Deleted ${results.customerGroups.deleted} customer groups`));
+      console.log(chalk.green(`✔ Deleted ${results.customerGroups.deleted} customer groups`));
     }
   }
   
@@ -679,7 +679,7 @@ async function performDeletion(detector, options) {
   if (deleteStores) {
     results.stores = await deleteProjectStores();
     if (results.stores.deleted > 0) {
-      finishLine(chalk.green(`✔ Deleted ${results.stores.deleted} stores/websites`));
+      console.log(chalk.green(`✔ Deleted ${results.stores.deleted} stores/websites`));
     }
   }
   
@@ -709,18 +709,40 @@ async function main() {
     console.log(chalk.green('✔ Testing Commerce API connection'));
   }
   
-  // Find all BuildRight data
-  const discovered = await withSpinner('Scanning for BuildRight data...', async () => {
-    // Wait a moment for any pending indexing to complete
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    // Clear cache to ensure fresh data
-    detector.clearCache();
+  // Find all project data
+  const discovered = await withSpinner('Scanning for project data...', async () => {
+    // Strategy: State tracker first (fast), then orphan detection (safety net)
+    const stateTracker = getStateTracker();
     
-    // Find all entity types based on deletion flags
-    const products = await findProjectProducts();
-    const categories = deleteCategories ? await detector.findAllCategories() : [];
-    const attributes = deleteAttributes ? await detector.findAllAttributes() : [];
-    const customerGroups = deleteCustomerGroups ? await detector.findAllCustomerGroups() : [];
+    // Try state tracker first (primary source - fast and reliable)
+    let products = stateTracker.getAllProductSKUs();
+    let categories = deleteCategories ? stateTracker.getAllCategoryIds() : [];
+    let attributes = deleteAttributes ? stateTracker.getAllAttributeCodes() : [];
+    let customerGroups = deleteCustomerGroups ? stateTracker.getAllCustomerGroupIds() : [];
+    
+    const hasState = products.length > 0;
+    
+    // If no state OR --scan flag, use smart detection (orphan cleanup)
+    if (!hasState || args.includes('--scan')) {
+      // Wait a moment for any pending indexing to complete
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Clear cache to ensure fresh data
+      detector.clearCache();
+      
+      // Use smart detection to find orphaned data
+      const detectedProducts = await findProjectProducts();
+      const detectedCategories = deleteCategories ? await detector.findAllCategories() : [];
+      const detectedAttributes = deleteAttributes ? await detector.findAllAttributes() : [];
+      const detectedCustomerGroups = deleteCustomerGroups ? await detector.findAllCustomerGroups() : [];
+      
+      // Merge with state data (union of both sources)
+      products = [...new Set([...products, ...detectedProducts])];
+      categories = [...new Set([...categories, ...detectedCategories])];
+      attributes = [...new Set([...attributes, ...detectedAttributes])];
+      customerGroups = [...new Set([...customerGroups, ...detectedCustomerGroups])];
+    }
+    
+    // Customer attributes and customers always require detection (not in state tracker)
     const customerAttrs = deleteCustomerAttrs ? await detector.findAllCustomerAttributes() : [];
     const customers = deleteCustomers ? await findProjectCustomers() : [];
     
@@ -744,7 +766,7 @@ async function main() {
   
   // Show what was found
   if (totalEntities === 0) {
-    console.log(chalk.green('✔ No BuildRight data found'));
+    console.log(chalk.green('✔ No project data found'));
     
     // Clear state tracker even when no data exists (in case of stale state)
     const stateTracker = getStateTracker();
@@ -767,7 +789,7 @@ async function main() {
   if (discovered.customerAttrs.length > 0) foundItems.push(`${discovered.customerAttrs.length} customer attributes`);
   if (discovered.customers.length > 0) foundItems.push(`${discovered.customers.length} customers`);
   
-  console.log(chalk.green(`✔ Found BuildRight data: ${foundItems.join(', ')}`));
+  console.log(chalk.green(`✔ Found project data: ${foundItems.join(', ')}`));
   
   // Confirm deletion
   if (!isDryRun && !skipConfirm && totalEntities > 0) {
@@ -779,7 +801,7 @@ async function main() {
     if (discovered.customerGroups.length > 0) console.log(format.warning(`  • ${discovered.customerGroups.length} customer groups`));
     if (discovered.customerAttrs.length > 0) console.log(format.warning(`  • ${discovered.customerAttrs.length} customer attributes`));
     if (discovered.customers.length > 0) console.log(format.warning(`  • ${discovered.customers.length} customers`));
-    if (deleteStores) console.log(format.warning(`  • BuildRight stores/websites (if any)`));
+    if (deleteStores) console.log(format.warning(`  • Project stores/websites (if any)`));
     console.log('Run with --dry-run to preview, or --yes to skip this prompt.');
     console.log('');
     

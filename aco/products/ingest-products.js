@@ -18,7 +18,7 @@ import { dirname, join } from 'path';
 import { BaseIngester } from '../../shared/base-ingester.js';
 import { withRetry } from '../../shared/retry-util.js';
 import { getStateTracker } from '../../shared/aco-state-tracker.js';
-import BuildRightDetector from '../../shared/smart-detector.js';
+import { SmartDetector } from '../../shared/smart-detector.js';
 import { PollingProgress } from '../../shared/progress.js';
 import { loadJSON, validateItems } from '../../shared/aco-helpers.js';
 import { DATA_REPO_PATH as DATA_REPO } from '../../shared/config-loader.js';
@@ -118,7 +118,7 @@ class ProductIngester extends BaseIngester {
     if (this.results.created.length > 0 && !this.silent) {
       this.logger.info('Polling ACO to verify ingestion (waiting for indexing to start)...');
       
-      const detector = new BuildRightDetector({ silent: this.silent });
+      const detector = new SmartDetector({ silent: this.silent });
       const skusToVerify = this.results.created.map(p => p.sku);
       
       const progress = new PollingProgress('Verifying products', skusToVerify.length);
@@ -133,13 +133,14 @@ class ProductIngester extends BaseIngester {
         attempt++;
         await new Promise(resolve => setTimeout(resolve, pollInterval));
         
-        const foundProducts = await detector.queryACOProductsBySKUs(skusToVerify);
+        // Use throwOnError=true to surface query failures during polling
+        const foundProducts = await detector.queryACOProductsBySKUs(skusToVerify, true);
         verifiedCount = foundProducts.length;
         
         // Detect when indexing starts (first movement)
         if (!indexingStarted && verifiedCount > 0) {
           indexingStarted = true;
-          this.logger.info(`  ✓ Indexing started (${verifiedCount} products indexed)`);
+          this.logger.info(`  ✓ Indexing in progress`);
         }
         
         progress.update(verifiedCount, attempt, maxAttempts);

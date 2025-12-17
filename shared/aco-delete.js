@@ -306,10 +306,79 @@ export async function deleteProductsBySKUs(skus, options = {}) {
   };
 }
 
+/**
+ * Delete metadata (product attributes)
+ * 
+ * @param {Array<string>} attributeCodes - Attribute codes to delete
+ * @param {Object} options - Delete options
+ * @param {string} [options.locale='en-US'] - Source locale
+ * @param {number} [options.batchSize=50] - Attributes per batch
+ * @param {boolean} [options.dryRun=false] - Dry run mode
+ * @returns {Promise<Object>} Deletion results
+ * 
+ * @example
+ * const result = await deleteMetadata(['br_product_category', 'br_brand']);
+ */
+export async function deleteMetadata(attributeCodes, options = {}) {
+  const { locale = 'en-US', batchSize = 50, dryRun = false } = options;
+  
+  logger.debug('Delete Metadata Operation', {
+    count: attributeCodes.length,
+    locale,
+    dryRun
+  });
+  
+  if (dryRun) {
+    logger.debug('[DRY-RUN] Would delete metadata:', attributeCodes.slice(0, 10));
+    return { deleted: 0, total: attributeCodes.length, dryRun: true };
+  }
+  
+  const client = getACOClient();
+  const metadataDeletes = attributeCodes.map(code => ({
+    code,
+    source: { locale }
+  }));
+  
+  logger.debug(`Deleting ${metadataDeletes.length} metadata attributes across ${Math.ceil(metadataDeletes.length / batchSize)} batches...`);
+  
+  let deletedCount = 0;
+  const errors = [];
+  
+  // Process in batches
+  for (let i = 0; i < metadataDeletes.length; i += batchSize) {
+    const batch = metadataDeletes.slice(i, i + batchSize);
+    const batchNum = Math.floor(i / batchSize) + 1;
+    
+    try {
+      const response = await client.deleteProductMetadata(batch);
+      const accepted = response.data?.acceptedCount || 0;
+      deletedCount += accepted;
+      
+    } catch (error) {
+      logger.error(`Batch ${batchNum} failed:`, error.message);
+      errors.push({
+        batch: batchNum,
+        error: error.message,
+        items: batch.length
+      });
+    }
+  }
+  
+  logger.debug(`Metadata deletion complete: ${deletedCount}/${attributeCodes.length} deleted`);
+  
+  return {
+    deleted: deletedCount,
+    total: attributeCodes.length,
+    errors,
+    success: errors.length === 0
+  };
+}
+
 export default {
   deletePricesBySKUs,
   deleteAllPricesForPriceBooks,
   deletePriceBooks,
-  deleteProductsBySKUs
+  deleteProductsBySKUs,
+  deleteMetadata
 };
 

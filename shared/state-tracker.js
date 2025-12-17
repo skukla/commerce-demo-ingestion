@@ -202,6 +202,29 @@ export class StateTracker {
   }
 
   /**
+   * Get all items as arrays (for deletion)
+   */
+  getAllProductSKUs() {
+    return Array.from(this.state.products);
+  }
+
+  getAllCategoryIds() {
+    return Array.from(this.state.categories);
+  }
+
+  getAllAttributeCodes() {
+    return Array.from(this.state.attributes);
+  }
+
+  getAllCustomerGroupIds() {
+    return Array.from(this.state.customerGroups);
+  }
+
+  getAllCustomerAttributeCodes() {
+    return Array.from(this.state.customerAttributes);
+  }
+
+  /**
    * Get statistics
    */
   getStats() {

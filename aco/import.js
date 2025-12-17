@@ -67,10 +67,9 @@ async function ingestAll() {
   console.log(format.muted(`Mode: ${dryRun ? 'DRY RUN (no changes will be made)' : 'LIVE'}`));
   console.log('');
   
-  // Clear state tracker to ensure fresh ingestion
+  // Clear state tracker to ensure fresh ingestion (silent)
   if (!dryRun) {
     try {
-      updateLine('🔄 Clearing stale state...');
       const stateTracker = getStateTracker();
       await stateTracker.load();
       const productCount = stateTracker.getProductCount();
@@ -79,10 +78,7 @@ async function ingestAll() {
         stateTracker.clearAll();
         await stateTracker.save();
       }
-      updateLine('✔ State cleared');
-      finishLine();
     } catch (error) {
-      finishLine();
       // Non-critical, continue
     }
   }

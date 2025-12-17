@@ -9,9 +9,12 @@
   },
   "scripts": {
     "import:commerce": "node commerce/import-all.js",
-    "delete:commerce": "node commerce/delete-all.js --all --yes",
     "import:aco": "node aco/import.js",
-    "delete:aco": "node aco/delete.js"
+    "import:all": "npm run import:commerce && npm run import:aco",
+    "delete:commerce": "node commerce/delete-all.js --all --yes",
+    "delete:aco": "node aco/delete.js",
+    "delete:all": "npm run delete:aco && npm run delete:commerce",
+    "reset:all": "npm run delete:all && npm run import:all"
   },
   "dependencies": {
     "@adobe-commerce/aco-ts-sdk": "^1.1.0",

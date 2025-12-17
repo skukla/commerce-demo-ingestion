@@ -100,7 +100,7 @@ class ACOStateTracker {
       
       // Always log state saves (not just debug) so we can verify it's working
       if (this.state.products.size > 0 || this.state.metadata.size > 0 || this.state.priceBooks.size > 0) {
-        logger.info(`💾 Saved state: ${this.state.products.size} products, ${this.state.metadata.size} metadata, ${this.state.priceBooks.size} price books`);
+        logger.debug(`💾 Saved state: ${this.state.products.size} products, ${this.state.metadata.size} metadata, ${this.state.priceBooks.size} price books`);
       } else {
         logger.debug('Saved empty ACO state');
       }
@@ -165,6 +165,10 @@ class ACOStateTracker {
     return wasNew;
   }
 
+  getAllMetadataCodes() {
+    return Array.from(this.state.metadata);
+  }
+
   getPriceBooks() {
     return Array.from(this.state.priceBooks);
   }
@@ -190,6 +194,34 @@ class ACOStateTracker {
     this.state.priceBooks.clear();
     this.state.prices.clear();
     this.state.lastUpdated = null;
+  }
+
+  /**
+   * Clear only product SKUs
+   */
+  clearProducts() {
+    this.state.products.clear();
+  }
+
+  /**
+   * Clear only prices
+   */
+  clearPrices() {
+    this.state.prices.clear();
+  }
+
+  /**
+   * Clear only price books
+   */
+  clearPriceBooks() {
+    this.state.priceBooks.clear();
+  }
+
+  /**
+   * Clear only metadata
+   */
+  clearMetadata() {
+    this.state.metadata.clear();
   }
 
   /**

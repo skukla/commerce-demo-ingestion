@@ -314,8 +314,13 @@ class ProductImporter extends BaseImporter {
       weight: product.weight || 1,
       extension_attributes: {
         category_links: this.getCategoryLinks(product.categories),
-        website_ids: this.websiteIds.length > 0 ? this.websiteIds : [1]
-        // Note: stock_item removed - Commerce MSI handles inventory automatically
+        website_ids: this.websiteIds.length > 0 ? this.websiteIds : [1],
+        stock_item: {
+          qty: product.qty || 100,
+          is_in_stock: true,
+          manage_stock: true,
+          use_config_manage_stock: false
+        }
       },
       custom_attributes: [
         { attribute_code: 'url_key', value: urlKey },

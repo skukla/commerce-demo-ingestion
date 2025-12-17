@@ -62,20 +62,20 @@ export function createACOClient(customConfig = null) {
   // Use custom config or load from environment
   const config = customConfig || {
     credentials: {
-      clientId: process.env.CLIENT_ID,
-      clientSecret: process.env.CLIENT_SECRET
+      clientId: process.env.ACO_CLIENT_ID,
+      clientSecret: process.env.ACO_CLIENT_SECRET
     },
-    tenantId: process.env.TENANT_ID,
-    region: process.env.REGION || 'na1',
-    environment: process.env.ENVIRONMENT || 'sandbox',
-    timeoutMs: parseInt(process.env.TIMEOUT_MS || '10000', 10)
+    tenantId: process.env.ACO_TENANT_ID,
+    region: process.env.ACO_REGION || 'na1',
+    environment: process.env.ACO_ENVIRONMENT || 'sandbox',
+    timeoutMs: parseInt(process.env.ACO_TIMEOUT_MS || '30000', 10)
   };
 
   // Validate required fields
   const missingFields = [];
-  if (!config.credentials?.clientId) missingFields.push('CLIENT_ID');
-  if (!config.credentials?.clientSecret) missingFields.push('CLIENT_SECRET');
-  if (!config.tenantId) missingFields.push('TENANT_ID');
+  if (!config.credentials?.clientId) missingFields.push('ACO_CLIENT_ID');
+  if (!config.credentials?.clientSecret) missingFields.push('ACO_CLIENT_SECRET');
+  if (!config.tenantId) missingFields.push('ACO_TENANT_ID');
 
   if (missingFields.length > 0) {
     throw new Error(
@@ -165,12 +165,12 @@ function constructEndpoint(config) {
  * // Returns: https://na1-sandbox.api.commerce.adobe.com/tenant-123/graphql
  */
 export function getGraphQLEndpoint() {
-  const region = process.env.REGION || 'na1';
-  const environment = process.env.ENVIRONMENT || 'sandbox';
-  const tenantId = process.env.TENANT_ID;
+  const region = process.env.ACO_REGION || 'na1';
+  const environment = process.env.ACO_ENVIRONMENT || 'sandbox';
+  const tenantId = process.env.ACO_TENANT_ID;
 
   if (!tenantId) {
-    throw new Error('TENANT_ID is required to construct GraphQL endpoint');
+    throw new Error('ACO_TENANT_ID is required to construct GraphQL endpoint');
   }
 
   const envSuffix = environment === 'sandbox' ? '-sandbox' : '';
@@ -188,10 +188,10 @@ export function getGraphQLEndpoint() {
  * // Returns: https://experience.adobe.com/#/@demosystem/in:tenant-123/commerce-optimizer-studio
  */
 export function getACOUIUrl() {
-  const tenantId = process.env.TENANT_ID;
+  const tenantId = process.env.ACO_TENANT_ID;
 
   if (!tenantId) {
-    throw new Error('TENANT_ID is required to construct ACO UI URL');
+    throw new Error('ACO_TENANT_ID is required to construct ACO UI URL');
   }
 
   return `https://experience.adobe.com/#/@demosystem/in:${tenantId}/commerce-optimizer-studio`;

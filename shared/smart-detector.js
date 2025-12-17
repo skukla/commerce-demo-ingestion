@@ -7,7 +7,7 @@
  */
 
 import { commerceApi, logger } from './commerce-api.js';
-import { COMMERCE_CONFIG } from './config-loader.js';
+import { COMMERCE_CONFIG, CUSTOMER_GROUPS } from './config-loader.js';
 
 /**
  * Smart detection strategies for project-specific data
@@ -17,12 +17,191 @@ export class SmartDetector {
   constructor(options = {}) {
     this.silent = options.silent || false;
     this.config = COMMERCE_CONFIG.project;
+    this.acoConfig = COMMERCE_CONFIG.aco;
+    
+    // Get customer group codes from loaded data
+    const customerGroupCodes = CUSTOMER_GROUPS ? CUSTOMER_GROUPS.map(g => g.code) : [];
+    
+    // Create patterns from project config for detection
+    this.config.patterns = {
+      category: [this.config.rootCategoryName], // Root category name pattern
+      attribute: [this.config.attributePrefix],  // Attribute prefix pattern
+      customerAttribute: [this.config.customerAttributePrefix || this.config.attributePrefix],
+      customerGroup: customerGroupCodes.length > 0 ? customerGroupCodes : ['.*'] // Use actual customer group codes
+    };
+    
     this.cache = {
       allProducts: null,
       allAttributes: null,
       allCategories: null,
       rootCategoryId: null
     };
+  }
+
+  /**
+   * Get ACO GraphQL endpoint
+   */
+  getACOEndpoint() {
+    const envSuffix = this.acoConfig.environment === 'sandbox' ? '-sandbox' : '';
+    return `https://${this.acoConfig.region}${envSuffix}.api.commerce.adobe.com/${this.acoConfig.tenantId}/graphql`;
+  }
+  
+  /**
+   * Get OAuth access token for ACO API
+   */
+  async getAccessToken() {
+    const IMS_TOKEN_URL = 'https://ims-na1.adobelogin.com/ims/token/v3';
+    
+    const params = new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: this.acoConfig.clientId,
+      client_secret: this.acoConfig.clientSecret,
+      scope: 'openid,AdobeID,additional_info.projectedProductContext'
+    });
+
+    const response = await fetch(IMS_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get access token: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.access_token;
+  }
+
+  /**
+   * Query ACO products by specific SKUs
+   * Returns products that exist in ACO (both visible and invisible)
+   */
+  async queryACOProductsBySKUs(skus, throwOnError = false) {
+    if (skus.length === 0) return [];
+    
+    try {
+      const token = await this.getAccessToken();
+      const endpoint = this.getACOEndpoint();
+
+      // GraphQL array syntax
+      const skuList = skus.map(sku => `"${sku}"`).join(', ');
+      
+      const query = `
+        query {
+          products(skus: [${skuList}]) {
+            __typename
+            sku
+            name
+          }
+        }
+      `;
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'AC-Environment-Id': this.acoConfig.tenantId,
+          'AC-Source-Locale': 'en-US'
+        },
+        body: JSON.stringify({ query })
+      });
+
+      if (!response.ok) {
+        const errorMsg = `ACO query failed with status ${response.status}`;
+        if (throwOnError) throw new Error(errorMsg);
+        logger.debug(errorMsg);
+        return [];
+      }
+
+      const result = await response.json();
+      
+      if (result.errors) {
+        const errorMsg = `ACO query returned errors: ${JSON.stringify(result.errors)}`;
+        if (throwOnError) throw new Error(errorMsg);
+        logger.debug(errorMsg);
+        return [];
+      }
+
+      const products = result.data?.products || [];
+      logger.debug(`ACO query returned ${products.length} products`);
+      return products;
+      
+    } catch (error) {
+      if (throwOnError) {
+        throw new Error(`Failed to query ACO products: ${error.message}`);
+      }
+      logger.debug(`Failed to query ACO products by SKUs: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Query ACO products directly via productSearch (only returns VISIBLE products)
+   * Note: Invisible variants (visibleIn: []) will NOT be returned
+   * 
+   * For validation without Live Search, use queryACOProductsBySKUs instead.
+   * 
+   * @param {string} phrase - Search phrase (empty string returns all)
+   * @param {number} limit - Max products to return
+   * @returns {Promise<Array<{sku: string, name: string}>>}
+   */
+  async queryACOProductsDirect(phrase = '', limit = 500) {
+    try {
+      const token = await this.getAccessToken();
+      const endpoint = this.getACOEndpoint();
+
+      const query = `
+        query ProductSearch($phrase: String!, $limit: Int) {
+          productSearch(phrase: $phrase, page_size: $limit) {
+            total_count
+            items {
+              productView {
+                sku
+                name
+              }
+            }
+          }
+        }
+      `;
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'AC-Environment-Id': this.acoConfig.tenantId,
+          'AC-Source-Locale': 'en-US',
+          'AC-Price-Book-Id': 'US-Retail'  // Required for productSearch
+        },
+        body: JSON.stringify({ 
+          query, 
+          variables: { phrase, limit } 
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`ACO search failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.errors) {
+        logger.debug('ACO search errors:', result.errors);
+        return [];
+      }
+
+      const items = result.data?.productSearch?.items || [];
+      return items.map(item => ({
+        sku: item.productView.sku,
+        name: item.productView.name
+      }));
+      
+    } catch (error) {
+      logger.debug(`Failed to query ACO products directly: ${error.message}`);
+      return [];
+    }
   }
 
   /**
@@ -352,6 +531,116 @@ export class SmartDetector {
   }
 
   /**
+   * Extract unique SKU prefixes from a list of SKUs
+   * Auto-detects project-specific SKU patterns (e.g., "STR-123" → "STR")
+   * 
+   * @param {Array<string>} skus - Array of SKUs
+   * @returns {Array<string>} Unique prefixes
+   */
+  extractSkuPrefixes(skus) {
+    return [...new Set(
+      skus
+        .filter(sku => sku.includes('-'))
+        .map(sku => sku.split('-')[0])
+    )];
+  }
+
+  /**
+   * Build regex pattern from SKU prefixes
+   * 
+   * @param {Array<string>} prefixes - Array of SKU prefixes
+   * @returns {RegExp|null} Regex pattern or null if no prefixes
+   */
+  buildSkuPattern(prefixes) {
+    if (prefixes.length === 0) {
+      return null;
+    }
+    return new RegExp(`^(${prefixes.join('|')})-`);
+  }
+
+  /**
+   * Validate that ACO is clean (no project data remains)
+   * Uses state tracker to know what SKUs to check
+   */
+  async validateACOClean(expectedSKUs = []) {
+    if (!this.silent) {
+      logger.info('\n🔍 Validating ACO is clean...');
+    }
+
+    const issues = [];
+
+    // Check expected products from state tracker
+    if (expectedSKUs.length > 0) {
+      try {
+        const acoProducts = await this.queryACOProductsBySKUs(expectedSKUs);
+        const productCount = acoProducts.length;
+        
+        if (!this.silent && productCount > 0) {
+          logger.info(`   📊 ${productCount} products remaining in Catalog Service`);
+        }
+        
+        if (productCount > 0) {
+          issues.push(`${productCount} products still exist in ACO`);
+          const remainingSKUs = acoProducts.slice(0, 10).map(p => p.sku).join(', ');
+          logger.debug(`Remaining products: ${remainingSKUs}${productCount > 10 ? '...' : ''}`);
+        }
+      } catch (error) {
+        if (!this.silent) {
+          logger.warn('Could not verify product deletion:', error.message);
+        }
+      }
+    }
+
+    // Check for unknown orphans (visible products only)
+    // Auto-detect SKU pattern from expected SKUs (state tracker)
+    try {
+      if (!this.silent) {
+        logger.info('🔍 Checking for unknown orphaned products...');
+      }
+      
+      // Extract unique prefixes and build dynamic pattern
+      const prefixes = this.extractSkuPrefixes(expectedSKUs);
+      const pattern = this.buildSkuPattern(prefixes);
+      
+      if (pattern) {
+        logger.debug(`Auto-detected SKU pattern: ${pattern}`);
+        
+        const orphanProducts = await this.queryACOProductsDirect('', 500);
+        if (orphanProducts.length > 0) {
+          // Filter to project products using auto-detected pattern
+          const projectOrphans = orphanProducts.filter(p => pattern.test(p.sku));
+          
+          if (projectOrphans.length > 0) {
+            issues.push(`${projectOrphans.length} unknown orphaned products found (visible only)`);
+            logger.debug(`Orphaned SKUs: ${projectOrphans.map(p => p.sku).slice(0, 10).join(', ')}...`);
+          }
+        }
+      } else {
+        logger.debug('No SKU prefixes detected - skipping orphan check');
+      }
+    } catch (error) {
+      // Non-critical - Live Search might not be enabled
+      logger.debug('Could not query for orphaned products (Live Search may not be enabled):', error.message);
+    }
+
+    if (issues.length > 0) {
+      if (!this.silent) {
+        logger.error('\n❌ Validation FAILED - Orphaned data detected:');
+        issues.forEach(issue => logger.error(`   • ${issue}`));
+      }
+      return {
+        clean: false,
+        issues
+      };
+    }
+
+    if (!this.silent) {
+      logger.success('✅ Validation PASSED - No project data remains in ACO\n');
+    }
+    return { clean: true, issues: [] };
+  }
+
+  /**
    * Helper: Get all products (with caching)
    */
   async getAllProducts() {
@@ -529,7 +818,3 @@ export class SmartDetector {
 }
 
 export default SmartDetector;
-
-// Backward compatibility alias for ACO scripts
-export { SmartDetector as BuildRightDetector };
-

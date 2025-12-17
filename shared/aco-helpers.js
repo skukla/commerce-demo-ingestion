@@ -17,12 +17,12 @@ import logger from './logger.js';
  */
 export async function loadJSON(filename, dataRepo, label = 'data') {
   const filePath = join(dataRepo, 'generated/aco', filename);
-  logger.info(`Loading ${label} from: ${filePath}`);
+  logger.debug(`Loading ${label} from: ${filePath}`);
   
   try {
     const content = await fs.readFile(filePath, 'utf-8');
     const data = JSON.parse(content);
-    logger.info(`Loaded ${Array.isArray(data) ? data.length : 'N/A'} ${label}`);
+    logger.debug(`Loaded ${Array.isArray(data) ? data.length : 'N/A'} ${label}`);
     return data;
   } catch (error) {
     throw new Error(`Failed to load ${label} from ${filePath}: ${error.message}`);
