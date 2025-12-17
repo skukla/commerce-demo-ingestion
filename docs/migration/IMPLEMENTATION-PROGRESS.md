@@ -104,7 +104,7 @@ const DATAPACK_PATH = resolve(DATA_REPO, 'generated/commerce/...');
 **state-tracker.js needs update:**
 ```javascript
 // Change from:
-const STATE_DIR = join(process.cwd(), '.buildright-state');
+const STATE_DIR = join(process.cwd(), `.${PROJECT_CONFIG.identifier}-state`);
 
 // To:
 import { PROJECT_CONFIG } from './config-loader.js';

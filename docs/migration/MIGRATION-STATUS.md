@@ -116,8 +116,8 @@ The buildright-commerce repository has been split into three independent reposit
    - Update all scripts to use this loader
 
 4. **Update state-tracker path:**
-   - Change `.buildright-state` to use `PROJECT_IDENTIFIER` from config
-   - Make it dynamic: `.${project.identifier}-state`
+   - ✅ Changed to use `PROJECT_CONFIG.identifier` from config
+   - ✅ Now dynamic: `.${PROJECT_CONFIG.identifier}-state`
 
 5. **Test ingestion:**
    ```bash

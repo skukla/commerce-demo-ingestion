@@ -358,7 +358,7 @@ const STATE_DIR = `.${PROJECT_CONFIG.identifier}-state`;
 import { getStateTracker } from '#shared/aco-state-tracker';
 
 const stateTracker = getStateTracker();
-// Presumably uses hardcoded '.buildright-state' or similar
+// Uses dynamic `.${PROJECT_CONFIG.identifier}-state` directory
 ```
 
 **Issues:**
