@@ -143,7 +143,8 @@ class ImageImporter extends BaseImporter {
   
   async getExistingImages(sku) {
     try {
-      const product = await this.api.get(`/rest/V1/products/${encodeURIComponent(sku)}`);
+      // Query at global scope to see all images
+      const product = await this.api.get(`/rest/all/V1/products/${encodeURIComponent(sku)}`);
       return product.media_gallery_entries || [];
     } catch (error) {
       this.logger.debug(`Could not check existing images for ${sku}: ${error.message}`);
@@ -179,15 +180,30 @@ class ImageImporter extends BaseImporter {
     };
     
     this.logger.debug(`Uploading ${content.name} for ${sku} with roles: ${imageTypes.join(', ')}`);
+    this.logger.debug(`Upload payload types: ${JSON.stringify(imageTypes)}`);
     
     try {
-      const result = await this.api.post(`/rest/V1/products/${encodeURIComponent(sku)}/media`, payload);
+      // Use global scope endpoint to ensure media is created at store_id=0
+      const result = await this.api.post(`/rest/all/V1/products/${encodeURIComponent(sku)}/media`, payload);
+      
+      this.logger.debug(`Upload API response for ${sku}: ${JSON.stringify(result)}`);
       
       if (result && result.id) {
-        this.logger.debug(`Successfully uploaded image for ${sku} (ID: ${result.id})`);
+        this.logger.debug(`Successfully uploaded image for ${sku} (ID: ${result.id}, file: ${result.file})`);
         await this.assignImageRoles(sku, result.file, imageTypes);
+      } else if (typeof result === 'number') {
+        // API sometimes returns just the ID as a number
+        this.logger.debug(`Image uploaded for ${sku} with ID: ${result}`);
+        // Need to fetch the image details to get the file path
+        const product = await this.api.get(`/rest/all/V1/products/${encodeURIComponent(sku)}`);
+        const uploadedImage = product.media_gallery_entries?.find(img => img.id === result);
+        if (uploadedImage) {
+          await this.assignImageRoles(sku, uploadedImage.file, imageTypes);
+        } else {
+          this.logger.warn(`Could not find uploaded image with ID ${result} for ${sku}`);
+        }
       } else {
-        this.logger.warn(`Image uploaded for ${sku} but no ID returned from API`);
+        this.logger.warn(`Image uploaded for ${sku} but unexpected response: ${JSON.stringify(result)}`);
       }
       
       return result;
@@ -202,26 +218,40 @@ class ImageImporter extends BaseImporter {
   
   async assignImageRoles(sku, imageFile, types) {
     try {
-      const product = {};
+      const custom_attributes = [];
       
+      // Image roles must be set via custom_attributes in Adobe Commerce
       if (types.includes('image')) {
-        product.image = imageFile;
+        custom_attributes.push({ attribute_code: 'image', value: imageFile });
       }
       if (types.includes('small_image')) {
-        product.small_image = imageFile;
+        custom_attributes.push({ attribute_code: 'small_image', value: imageFile });
       }
       if (types.includes('thumbnail')) {
-        product.thumbnail = imageFile;
+        custom_attributes.push({ attribute_code: 'thumbnail', value: imageFile });
       }
-      if (types.includes('swatch_image')) {
-        product.swatch_image = imageFile;
+      // Note: swatch_image is not a standard attribute and causes API errors
+      
+      if (custom_attributes.length > 0) {
+        this.logger.debug(`Assigning roles for ${sku} - file: ${imageFile}, types: ${types.join(', ')}`);
+        
+        // CRITICAL: Use /rest/all/V1/ to ensure role assignments are created at store_id=0 (global scope)
+        // Using /rest/V1/ defaults to store_id=1, which causes roles to be invisible in admin UI when viewing "All Store Views"
+        // Reference: https://github.com/magento/magento2/issues/10863
+        await this.api.put(`/rest/all/V1/products/${encodeURIComponent(sku)}`, { 
+          product: { 
+            sku,
+            custom_attributes 
+          } 
+        });
+        
+        this.logger.debug(`Role assignment successful for ${sku} at global scope`);
       }
-      
-      await this.api.put(`/rest/V1/products/${encodeURIComponent(sku)}`, { product });
-      
-      this.logger.debug(`Assigned image roles for ${sku}: ${types.join(', ')}`);
     } catch (error) {
-      this.logger.warn(`Failed to assign image roles for ${sku}: ${error.message}`);
+      this.logger.error(`Failed to assign image roles for ${sku}: ${error.message}`);
+      if (error.response?.data) {
+        this.logger.error(`API error details: ${JSON.stringify(error.response.data)}`);
+      }
     }
   }
 }

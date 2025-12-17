@@ -149,12 +149,19 @@ export class PollingProgress {
     updateLine(`${this.action} ${bar} | ${suffix}`);
   }
 
-  finish(finalCount, success = true) {
+  finish(finalCount, success = true, customMessage = null) {
     const elapsed = Math.round((Date.now() - this.startTime) / 1000);
-    const icon = success ? chalk.green('✔') : '⚠️';
     const bar = formatProgressBar(finalCount, this.expectedCount, { width: 20 });
     
-    updateLine(`${icon} ${this.action} ${bar} | completed in ${elapsed}s`);
+    let message;
+    if (customMessage) {
+      message = chalk.green(`✔ ${customMessage}`);
+    } else {
+      const icon = success ? chalk.green('✔') : '⚠️';
+      message = `${icon} ${this.action} ${bar} | completed in ${elapsed}s`;
+    }
+    
+    updateLine(message);
     finishLine();
   }
 }

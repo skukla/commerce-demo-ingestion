@@ -169,21 +169,41 @@ class VariantIngester extends BaseIngester {
       let attempt = 0;
       let verifiedCount = 0;
       let indexingStarted = false;
+      let remainingSkus = [...skusToVerify];
+      let verifiedSkus = new Set();
+      
+      // Helper: Check SKUs in batches (without progress updates during batching)
+      const checkInBatches = async (skusToCheck) => {
+        const BATCH_SIZE = 50;
+        const found = [];
+        
+        for (let i = 0; i < skusToCheck.length; i += BATCH_SIZE) {
+          const batch = skusToCheck.slice(i, i + BATCH_SIZE);
+          const batchFound = await detector.queryACOProductsBySKUs(batch, true);
+          found.push(...batchFound);
+        }
+        
+        return found;
+      };
       
       while (attempt < maxAttempts && verifiedCount < skusToVerify.length) {
         attempt++;
         await new Promise(resolve => setTimeout(resolve, pollInterval));
         
-        // Use throwOnError=true to surface query failures during polling
-        const foundVariants = await detector.queryACOProductsBySKUs(skusToVerify, true);
-        verifiedCount = foundVariants.length;
+        // Check remaining SKUs in batches
+        const foundVariants = await checkInBatches(remainingSkus);
+        
+        // Update verified SKUs and count (once per poll)
+        foundVariants.forEach(p => verifiedSkus.add(p.sku));
+        verifiedCount = verifiedSkus.size;
+        remainingSkus = skusToVerify.filter(sku => !verifiedSkus.has(sku));
         
         // Detect when indexing starts (first movement)
         if (!indexingStarted && verifiedCount > 0) {
           indexingStarted = true;
-          this.logger.info(`  ✓ Indexing in progress`);
         }
         
+        // Update progress bar once per poll
         progress.update(verifiedCount, attempt, maxAttempts);
         
         if (verifiedCount === skusToVerify.length) {

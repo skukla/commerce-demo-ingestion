@@ -28,8 +28,8 @@ const __dirname = dirname(__filename);
 const DATAPACK_PRODUCTS_PATH = resolve(DATA_REPO_PATH, 'generated/commerce/data/accs/accs_products.json');
 
 // Default concurrency for parallel processing
-// Reduced from 15 to 5 to prevent race conditions and orphaned products
-const DEFAULT_CONCURRENCY = 5;
+// Reduced from 15 to 3 to prevent race conditions and inventory save errors
+const DEFAULT_CONCURRENCY = 3;
 const BULK_API_THRESHOLD = 99999;
 
 class ProductImporter extends BaseImporter {

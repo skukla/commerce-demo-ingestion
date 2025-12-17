@@ -7,6 +7,7 @@
 import { updateLine, finishLine } from '../shared/progress.js';
 import { format } from '../shared/format.js';
 import { formatDuration } from '../shared/aco-ingest-helpers.js';
+import chalk from 'chalk';
 
 // Import ingestion functions
 import { ingestMetadata } from './attributes/ingest-metadata.js';
@@ -45,7 +46,7 @@ async function executeIngestionStep(stepName, ingestFn, options = {}) {
   }
   message += ')';
   
-  updateLine(message);
+  updateLine(chalk.green(message));
   finishLine();
   
   return {

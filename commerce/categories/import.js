@@ -28,14 +28,16 @@ class CategoryImporter extends BaseImporter {
   async import() {
     // Count total categories (parent + children)
     const totalCategories = 1 + this.countCategories(CATEGORY_TREE.children || []);
-    this.logger.info(`Total categories to process: ${totalCategories}`);
     
     // Pre-fetch all categories once for fast lookups
-    this.logger.info('Pre-fetching existing categories...');
     await this.preFetchCategories();
     
     // Determine root category
     const rootId = await this.getRootCategoryId();
+    
+    // Start progress bar
+    const { BatchProgress } = await import('../../shared/progress.js');
+    this.progress = new BatchProgress('Importing categories', totalCategories);
     
     // Create/find project root category
     const parentId = await this.ensureProjectRootCategory(rootId);
@@ -45,7 +47,11 @@ class CategoryImporter extends BaseImporter {
       await this.createCategoryTree(CATEGORY_TREE.children, parentId);
     }
     
-    this.logger.info(`\nCategories processed: ${this.results.created.length} created, ${this.results.existing.length} existing`);
+    // Clear progress bar (orchestrator will show the summary)
+    if (this.progress) {
+      const { updateLine } = await import('../../shared/format.js');
+      updateLine(''); // Clear the progress bar line
+    }
     
     return { 
       categoryMap: this.categoryMap,
@@ -97,6 +103,7 @@ class CategoryImporter extends BaseImporter {
       this.categoryMap[this.rootCategoryUrlKey] = existing.id;
       this.results.addExisting({ name: CATEGORY_TREE.name, id: existing.id });
       this.stateTracker.addCategory(existing.id);
+      if (this.progress) this.progress.increment('existing');
       return existing.id;
     }
     
@@ -118,6 +125,7 @@ class CategoryImporter extends BaseImporter {
         this.categoryMap[CATEGORY_TREE.name] = 'dry-run-parent';
         this.categoryMap[this.rootCategoryUrlKey] = 'dry-run-parent';
         this.results.addCreated({ name: CATEGORY_TREE.name, id: 'dry-run' });
+        if (this.progress) this.progress.increment('created');
         return 'dry-run-parent';
       }
       
@@ -125,6 +133,7 @@ class CategoryImporter extends BaseImporter {
       this.categoryMap[this.rootCategoryUrlKey] = created.id;
       this.results.addCreated({ name: CATEGORY_TREE.name, id: created.id, urlKey: this.rootCategoryUrlKey });
       this.stateTracker.addCategory(created.id);
+      if (this.progress) this.progress.increment('created');
       
       // Add to cache for subsequent lookups
       if (this.allCategories) {
@@ -135,6 +144,7 @@ class CategoryImporter extends BaseImporter {
     } catch (error) {
       this.logger.error(`  Failed to create root category: ${error.message}`);
       this.results.addFailed({ name: CATEGORY_TREE.name }, error);
+      if (this.progress) this.progress.increment('failed');
       throw error;
     }
   }
@@ -152,6 +162,7 @@ class CategoryImporter extends BaseImporter {
         categoryId = existing.id;
         this.results.addExisting({ name: catDef.name, id: categoryId, urlKey: catDef.urlKey });
         this.stateTracker.addCategory(categoryId);
+        if (this.progress) this.progress.increment('existing');
       } else {
         // Create category
         try {
@@ -184,9 +195,11 @@ class CategoryImporter extends BaseImporter {
           
           this.results.addCreated({ name: catDef.name, id: categoryId, urlKey: catDef.urlKey });
           this.stateTracker.addCategory(categoryId);
+          if (this.progress) this.progress.increment('created');
         } catch (error) {
           this.logger.error(`${indent}  Failed to create ${catDef.name}: ${error.message}`);
           this.results.addFailed({ name: catDef.name }, error);
+          if (this.progress) this.progress.increment('failed');
           continue; // Skip children if parent failed
         }
       }

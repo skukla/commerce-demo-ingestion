@@ -15,9 +15,10 @@
  * - Zero orphaned data guarantee
  * 
  * Usage:
- *   npm run reset:all                    # Delete everything with validation
- *   node scripts/reset-all.js --dry-run  # Preview what would be deleted
- *   node scripts/reset-all.js --reingest # Delete and re-ingest all data
+ *   npm run delete:aco                    # Delete using state tracker
+ *   npm run delete:aco -- --scan          # Force scan ACO directly for orphans
+ *   npm run delete:aco -- --dry-run       # Preview what would be deleted
+ *   npm run delete:aco -- --reingest      # Delete and re-ingest all data
  * 
  * @module scripts/reset-all
  */
@@ -41,6 +42,7 @@ const reingest = args.includes('--reingest');
 const skipPrices = args.includes('--skip-prices');
 const skipProducts = args.includes('--skip-products');
 const skipValidation = args.includes('--skip-validation');
+const forceScan = args.includes('--scan');
 
 /**
  * Smart project detector
@@ -67,7 +69,7 @@ async function resetAll() {
     // Use smart detection to find all project entities
     const { updateLine, finishLine} = await import('../shared/progress.js');
     
-    // Find data (single line) - Use state tracker as source of truth
+    // Find data (single line) - Use state tracker as source of truth, unless --scan is used
     updateLine('🔍 Finding project data...');
     
     // Get ALL SKUs from state tracker (records exactly what was ingested)
@@ -77,15 +79,35 @@ async function resetAll() {
     
     const stateTracker = getStateTracker();
     await stateTracker.load();
-    const skus = stateTracker.getAllProductSKUs();
+    let skus = stateTracker.getAllProductSKUs();
     
     // Get price books from state tracker
-    const priceBookIds = stateTracker.getPriceBooks();
+    let priceBookIds = stateTracker.getPriceBooks();
     
     // Get metadata from state tracker
-    const metadataCodes = stateTracker.getAllMetadataCodes();
+    let metadataCodes = stateTracker.getAllMetadataCodes();
     
-    // Check if there's anything to delete
+    // If --scan flag is used OR state is empty, query ACO directly for orphaned products
+    const stateIsEmpty = skus.length === 0 && priceBookIds.length === 0 && metadataCodes.length === 0;
+    
+    if (forceScan || stateIsEmpty) {
+      if (forceScan) {
+        logger.debug('--scan flag detected, querying ACO directly for all products');
+      } else {
+        logger.debug('State tracker is empty, querying ACO directly for orphaned products');
+      }
+      
+      // Query ACO for all visible products (productSearch)
+      const acoProducts = await detector.queryACOProductsDirect('', 500);
+      const acoSKUs = acoProducts.map(p => p.sku);
+      
+      // Merge with state tracker SKUs (if any) and dedupe
+      skus = [...new Set([...skus, ...acoSKUs])];
+      
+      logger.debug(`Found ${acoSKUs.length} products in ACO, ${skus.length} total after merge with state`);
+    }
+    
+    // Check if there's anything to delete after both state and scan
     if (skus.length === 0 && priceBookIds.length === 0 && metadataCodes.length === 0) {
       updateLine(chalk.green('✔ No project data found'));
       finishLine();
@@ -154,51 +176,67 @@ async function resetAll() {
         const maxAttempts = 60; // 10 minutes max
         const pollInterval = 10000; // 10 seconds
         let attempt = 0;
-        let currentCount = skus.length;
-        let previousCount = skus.length;
         let deletionStarted = false;
         let pollingCompletedSuccessfully = false;
         
-        while (attempt < maxAttempts && currentCount > 0) {
+        // Track which SKUs still need to be checked
+        let remainingSkus = [...skus];
+        let confirmedDeleted = 0;
+        
+        // Helper: Check SKUs in batches (without progress updates during batching)
+        const checkRemainingInBatches = async (skusToCheck) => {
+          const BATCH_SIZE = 50; // Check 50 SKUs at a time
+          const stillRemaining = [];
+          
+          for (let i = 0; i < skusToCheck.length; i += BATCH_SIZE) {
+            const batch = skusToCheck.slice(i, i + BATCH_SIZE);
+            const batchRemaining = await detector.queryACOProductsBySKUs(batch, true);
+            stillRemaining.push(...batchRemaining);
+          }
+          
+          return stillRemaining;
+        };
+        
+        while (attempt < maxAttempts && remainingSkus.length > 0) {
           attempt++;
           
           await new Promise(resolve => setTimeout(resolve, pollInterval));
           
-          // Check how many products still exist
-          // Use throwOnError=true during polling to surface query failures
-          const remainingProducts = await detector.queryACOProductsBySKUs(skus, true);
-          currentCount = remainingProducts.length;
-          const deletedCount = skus.length - currentCount;
+          // Check remaining SKUs in batches
+          const stillRemainingProducts = await checkRemainingInBatches(remainingSkus);
+          const previousRemaining = remainingSkus.length;
+          remainingSkus = stillRemainingProducts.map(p => p.sku);
           
-          logger.debug(`Poll #${attempt}: ${currentCount} products remaining, ${deletedCount} deleted`);
+          // Update confirmed deleted count and progress (once per poll)
+          confirmedDeleted = skus.length - remainingSkus.length;
+          
+          logger.debug(`Poll #${attempt}: ${remainingSkus.length} products remaining, ${confirmedDeleted} deleted`);
           
           // Detect when deletion starts (first movement)
-          if (!deletionStarted && currentCount < previousCount) {
+          if (!deletionStarted && remainingSkus.length < previousRemaining) {
             deletionStarted = true;
-            console.log(chalk.green(`\n  ✓ Deletion in progress`));
           }
           
-          progress.update(deletedCount, attempt, maxAttempts);
+          // Update progress bar once per poll
+          progress.update(confirmedDeleted, attempt, maxAttempts);
           
-          if (currentCount === 0) {
-            progress.finish(deletedCount, true);
+          if (remainingSkus.length === 0) {
+            progress.finish(skus.length, true, `Deleted ${skus.length} products`);
             pollingCompletedSuccessfully = true;
             break;
           }
-          
-          previousCount = currentCount;
         }
         
-        if (currentCount > 0) {
-          progress.finish(skus.length - currentCount, false);
+        if (remainingSkus.length > 0) {
+          progress.finish(confirmedDeleted, false, `Deleted ${confirmedDeleted} of ${skus.length} products (${remainingSkus.length} remaining)`);
           if (!deletionStarted) {
             console.log(chalk.yellow(`\nDeletion submitted but not yet processed. Products may still appear in search.`));
           } else {
-            throw new Error(`${currentCount} products still remain after ${attempt * 10}s`);
+            throw new Error(`${remainingSkus.length} products still remain after ${attempt * 10}s`);
           }
         }
         
-        deleteResult.actualDeleted = skus.length - currentCount;
+        deleteResult.actualDeleted = confirmedDeleted;
         deleteResult.pollingCompleted = pollingCompletedSuccessfully;
       } else {
         updateLine(chalk.green(`✔ Deleting products (${deleteResult.deleted} deleted)`));
@@ -291,31 +329,47 @@ async function resetAll() {
           const progress = new PollingProgress('Cleaning up orphans', allOrphanSkus.length);
           
           let attempt = 0;
-          let currentCount = allOrphanSkus.length;
-          let previousCount = allOrphanSkus.length;
           let cleanupStarted = false;
+          let remainingOrphanSkus = [...allOrphanSkus];
+          let confirmedOrphansDeleted = 0;
           const maxAttempts = 60; // 10 minutes max (matching main deletion)
           
-          while (attempt < maxAttempts && currentCount > 0) {
+          // Helper: Check SKUs in batches (without progress updates during batching)
+          const checkOrphansInBatches = async (skusToCheck) => {
+            const BATCH_SIZE = 50;
+            const stillRemaining = [];
+            
+            for (let i = 0; i < skusToCheck.length; i += BATCH_SIZE) {
+              const batch = skusToCheck.slice(i, i + BATCH_SIZE);
+              const batchRemaining = await detector.queryACOProductsBySKUs(batch, true);
+              stillRemaining.push(...batchRemaining);
+            }
+            
+            return stillRemaining;
+          };
+          
+          while (attempt < maxAttempts && remainingOrphanSkus.length > 0) {
             attempt++;
             await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds
-            const remaining = await detector.queryACOProductsBySKUs(allOrphanSkus);
-            currentCount = remaining.length;
+            const stillRemaining = await checkOrphansInBatches(remainingOrphanSkus);
+            const previousRemaining = remainingOrphanSkus.length;
+            remainingOrphanSkus = stillRemaining.map(p => p.sku);
+            
+            // Update confirmed deleted count and progress (once per poll)
+            confirmedOrphansDeleted = allOrphanSkus.length - remainingOrphanSkus.length;
             
             // Detect when cleanup starts
-            if (!cleanupStarted && currentCount < previousCount) {
+            if (!cleanupStarted && remainingOrphanSkus.length < previousRemaining) {
               cleanupStarted = true;
-              console.log(format.muted(`  ✓ Cleanup in progress`));
             }
             
-            progress.update(allOrphanSkus.length - currentCount, attempt, maxAttempts);
+            // Update progress bar once per poll
+            progress.update(confirmedOrphansDeleted, attempt, maxAttempts);
             
-            if (currentCount === 0) {
-              progress.finish(allOrphanSkus.length, true);
+            if (remainingOrphanSkus.length === 0) {
+              progress.finish(allOrphanSkus.length, true, `Deleted ${allOrphanSkus.length} orphaned products`);
               break;
             }
-            
-            previousCount = currentCount;
           }
         }
         
