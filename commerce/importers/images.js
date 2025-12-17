@@ -137,7 +137,7 @@ class ImageImporter extends BaseImporter {
       }
     } catch (error) {
       this.results.addFailed({ sku }, error);
-      this.logger.error(`Failed to upload images for ${sku}: ${error.message}`);
+      this.logger.error(`\nFailed to upload images for ${sku}: ${error.message}`);
     }
   }
   
@@ -208,7 +208,7 @@ class ImageImporter extends BaseImporter {
       
       return result;
     } catch (error) {
-      this.logger.error(`Image upload API error for ${sku}: ${error.message}`);
+      this.logger.error(`\nImage upload API error for ${sku}: ${error.message}`);
       if (error.response && error.response.data) {
         this.logger.error(`API response: ${JSON.stringify(error.response.data)}`);
       }
