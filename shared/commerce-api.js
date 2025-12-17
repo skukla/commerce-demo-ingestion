@@ -321,6 +321,28 @@ export const commerceApi = {
     return apiRequest('POST', endpoint, { entry: media });
   },
   
+  // ==================== Multi-Source Inventory (MSI) ====================
+  
+  /**
+   * Assign product to inventory source(s)
+   * Required when MSI is enabled in Commerce
+   */
+  async assignSourceItems(sourceItems) {
+    return apiRequest('POST', '/rest/V1/inventory/source-items', { sourceItems });
+  },
+  
+  /**
+   * Assign a single product to a source with quantity
+   */
+  async assignProductToSource(sku, sourceCode = 'default', quantity = 100, status = 1) {
+    return this.assignSourceItems([{
+      sku,
+      source_code: sourceCode,
+      quantity,
+      status
+    }]);
+  },
+  
   // ==================== Bundle Products ====================
   
   async addBundleOption(sku, option) {

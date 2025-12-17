@@ -191,14 +191,14 @@ export class BatchProgress {
     const rate = elapsed > 0 ? (this.processed / elapsed).toFixed(1) : '?';
     const bar = formatProgressBar(this.processed, this.total, { width: 20 });
     
-    updateLine(`${this.action} ${bar} | ${rate}/s | ${chalk.green('✔')}${this.created} 🔄${this.existing} ❌${this.failed}`);
+    updateLine(`${this.action} ${bar} | ${rate}/s | ${this.created} created, ${this.existing} existing, ${this.failed} failed`);
   }
 
   finish() {
     const elapsed = Math.round((Date.now() - this.startTime) / 1000);
     const bar = formatProgressBar(this.processed, this.total, { width: 20 });
     
-    updateLine(`${chalk.green('✔')} ${this.action} ${bar} | completed in ${elapsed}s | ${chalk.green('✔')}${this.created} 🔄${this.existing} ❌${this.failed}`);
+    updateLine(`${chalk.green('✔')} ${this.action} ${bar} | completed in ${elapsed}s | ${this.created} created, ${this.existing} existing, ${this.failed} failed`);
     finishLine();
   }
 }

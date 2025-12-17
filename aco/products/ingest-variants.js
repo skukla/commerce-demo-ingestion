@@ -157,8 +157,11 @@ class VariantIngester extends BaseIngester {
     }
     
     // Poll ACO to verify ingestion
-    if (this.results.created.length > 0 && !this.silent) {
-      this.logger.info('Polling ACO to verify ingestion (waiting for indexing to start)...');
+    if (this.results.created.length > 0) {
+      // Always show progress bar (even in silent mode) - it's the actual operation progress
+      if (!this.silent) {
+        this.logger.info('Polling ACO to verify ingestion (waiting for indexing to start)...');
+      }
       
       const detector = new SmartDetector({ silent: this.silent });
       const skusToVerify = this.results.created.map(v => v.sku);

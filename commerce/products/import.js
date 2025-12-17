@@ -28,8 +28,9 @@ const __dirname = dirname(__filename);
 const DATAPACK_PRODUCTS_PATH = resolve(DATA_REPO_PATH, 'generated/commerce/data/accs/accs_products.json');
 
 // Default concurrency for parallel processing
-// Reduced from 15 to 3 to prevent race conditions and inventory save errors
-const DEFAULT_CONCURRENCY = 3;
+// Restored to 10 after fixing MSI "Could not save Source Item Configuration" error
+// (Previously reduced to 3 as a workaround for inventory conflicts)
+const DEFAULT_CONCURRENCY = 10;
 const BULK_API_THRESHOLD = 99999;
 
 class ProductImporter extends BaseImporter {
@@ -281,6 +282,21 @@ class ProductImporter extends BaseImporter {
         { name: `Create product ${sku}` }
       );
       
+      // Assign to inventory source (MSI) after product creation
+      // This prevents "Could not save Source Item Configuration" errors
+      try {
+        await this.api.assignProductToSource(
+          sku, 
+          'default',  // Default source code
+          product.qty || 100,
+          1  // In stock
+        );
+        this.logger.debug(`Assigned inventory source for: ${sku}`);
+      } catch (msiError) {
+        // Log but don't fail - MSI might not be enabled or already assigned
+        this.logger.debug(`MSI assignment warning for ${sku}: ${msiError.message}`);
+      }
+      
       this.results.addCreated({ sku, name });
       this.addToSkuMap(product);
       this.stateTracker.addProduct(sku);
@@ -314,13 +330,9 @@ class ProductImporter extends BaseImporter {
       weight: product.weight || 1,
       extension_attributes: {
         category_links: this.getCategoryLinks(product.categories),
-        website_ids: this.websiteIds.length > 0 ? this.websiteIds : [1],
-        stock_item: {
-          qty: product.qty || 100,
-          is_in_stock: true,
-          manage_stock: true,
-          use_config_manage_stock: false
-        }
+        website_ids: this.websiteIds.length > 0 ? this.websiteIds : [1]
+        // stock_item removed - inventory is managed via MSI source_items API
+        // This prevents "Could not save Source Item Configuration" errors
       },
       custom_attributes: [
         { attribute_code: 'url_key', value: urlKey },

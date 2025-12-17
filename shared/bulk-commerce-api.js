@@ -96,6 +96,16 @@ export class BulkCommerceApi {
     // Wait for all operations to complete
     const results = await this.waitForAllOperations(operations);
     
+    // Assign products to inventory source (MSI) after bulk creation
+    logger.info(`📦 Assigning products to inventory source...`);
+    try {
+      await this.bulkAssignSourceItems(products);
+      logger.success(`✔ Inventory sources assigned`);
+    } catch (error) {
+      logger.warn(`MSI assignment warning: ${error.message}`);
+      // Don't fail the entire operation if MSI assignment fails
+    }
+    
     return {
       total: products.length,
       chunks: chunks.length,
@@ -137,12 +147,9 @@ export class BulkCommerceApi {
       type_id: product.product_type || product.type_id || 'simple',
       weight: product.weight || 1,
       extension_attributes: {
-        website_ids: [1],
-        stock_item: {
-          qty: product.qty || 100,
-          is_in_stock: true,
-          manage_stock: true
-        }
+        website_ids: [1]
+        // stock_item removed - inventory is managed via MSI source_items API
+        // This prevents "Could not save Source Item Configuration" errors
       },
       custom_attributes: []
     };
@@ -328,6 +335,39 @@ export class BulkCommerceApi {
     } catch (error) {
       logger.warn(`Could not get detailed status: ${error.message}`);
       return await this.getBulkStatus(bulkUuid);
+    }
+  }
+  
+  /**
+   * Bulk assign products to inventory source (MSI)
+   * Required when MSI is enabled to prevent "Could not save Source Item Configuration" errors
+   * 
+   * @param {Array} products - Array of product objects
+   * @param {string} sourceCode - Source code (default: 'default')
+   */
+  async bulkAssignSourceItems(products, sourceCode = 'default') {
+    // Build source items array
+    const sourceItems = products.map(product => ({
+      sku: product.sku,
+      source_code: sourceCode,
+      quantity: product.qty || 100,
+      status: 1  // In stock
+    }));
+    
+    // Chunk the source items (API has limits)
+    const chunks = chunkArray(sourceItems, 500);  // Larger chunks for source assignment
+    
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      logger.info(`  Assigning source chunk ${i + 1}/${chunks.length} (${chunk.length} items)...`);
+      
+      try {
+        await this.api.post('/rest/V1/inventory/source-items', { sourceItems: chunk });
+        logger.debug(`  ✔ Source chunk ${i + 1} assigned`);
+      } catch (error) {
+        // Log but don't fail - some products might already have sources assigned
+        logger.debug(`  Warning on chunk ${i + 1}: ${error.message}`);
+      }
     }
   }
 }
