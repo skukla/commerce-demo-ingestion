@@ -232,21 +232,52 @@ class ImageImporter extends BaseImporter {
       }
       // Note: swatch_image is not a standard attribute and causes API errors
       
-      if (custom_attributes.length > 0) {
-        this.logger.debug(`Assigning roles for ${sku} - file: ${imageFile}, types: ${types.join(', ')}`);
-        
-        // CRITICAL: Use /rest/all/V1/ to ensure role assignments are created at store_id=0 (global scope)
-        // Using /rest/V1/ defaults to store_id=1, which causes roles to be invisible in admin UI when viewing "All Store Views"
-        // Reference: https://github.com/magento/magento2/issues/10863
-        await this.api.put(`/rest/all/V1/products/${encodeURIComponent(sku)}`, { 
-          product: { 
-            sku,
-            custom_attributes 
-          } 
-        });
-        
-        this.logger.debug(`Role assignment successful for ${sku} at global scope`);
+      if (custom_attributes.length === 0) {
+        return;
       }
+      
+      this.logger.debug(`Assigning roles for ${sku} - file: ${imageFile}, types: ${types.join(', ')}`);
+      
+      // CRITICAL: Assign at BOTH global and store view levels
+      // In multi-store setups, store-level values override global values
+      // If store-level is "no_selection", images won't appear even if globally set
+      // Reference: https://github.com/magento/magento2/issues/10863
+      
+      // 1. Assign at global scope (all stores)
+      await this.api.put(`/rest/all/V1/products/${encodeURIComponent(sku)}`, { 
+        product: { 
+          sku,
+          custom_attributes 
+        } 
+      });
+      this.logger.debug(`✓ Global scope assignment successful for ${sku}`);
+      
+      // 2. Get all store views and assign at each store view level
+      // This ensures store-level overrides don't block images in ACO
+      try {
+        const storeViews = await this.api.get('/rest/V1/store/storeViews');
+        
+        for (const storeView of storeViews) {
+          if (storeView.code === 'admin') continue; // Skip admin store view
+          
+          try {
+            await this.api.put(`/rest/${storeView.code}/V1/products/${encodeURIComponent(sku)}`, { 
+              product: { 
+                sku,
+                custom_attributes 
+              } 
+            });
+            this.logger.debug(`✓ Store view '${storeView.code}' assignment successful for ${sku}`);
+          } catch (storeError) {
+            // Log but don't fail - some stores might not have the product
+            this.logger.debug(`Could not assign roles for ${sku} in store '${storeView.code}': ${storeError.message}`);
+          }
+        }
+      } catch (storeError) {
+        this.logger.warn(`Could not fetch store views for ${sku}: ${storeError.message}`);
+        // Continue - at least we have global assignment
+      }
+      
     } catch (error) {
       this.logger.error(`Failed to assign image roles for ${sku}: ${error.message}`);
       if (error.response?.data) {
