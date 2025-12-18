@@ -7,7 +7,8 @@
 import { updateLine, finishLine } from '../shared/progress.js';
 import { format } from '../shared/format.js';
 import { formatDuration } from './lib/aco-ingest-helpers.js';
-import { COMMERCE_CONFIG } from '../shared/config-loader.js';
+import { COMMERCE_CONFIG, DATA_REPO_PATH } from '../shared/config-loader.js';
+import { loadJSON } from './lib/aco-helpers.js';
 import chalk from 'chalk';
 
 // Import ingestion functions
@@ -133,6 +134,65 @@ async function ingestAll() {
     console.log('');
     console.log(format.error(`Ingestion process failed: ${error.message}`));
     return { success: false, error: error.message, results };
+  }
+  
+  // Final verification: Poll until both Catalog Service and Live Search have the expected counts
+  const totalExpected = (results.products?.ingested || 0) + (results.variants?.ingested || 0);
+  if (totalExpected > 0) {
+    console.log('');
+    console.log('📊 Verifying catalog indexing...');
+    
+    const { SmartDetector } = await import('./lib/smart-detector.js');
+    const detector = new SmartDetector(COMMERCE_CONFIG);
+    
+    // Load product and variant SKUs for verification
+    const products = await loadJSON('products.json', DATA_REPO_PATH, 'products');
+    const variants = await loadJSON('variants.json', DATA_REPO_PATH, 'variants');
+    const allSkus = [...products.map(p => p.sku), ...variants.map(v => v.sku)];
+    
+    const maxAttempts = 30; // 5 minutes max (10 second intervals)
+    const pollInterval = 10000;
+    let catalogVerified = false;
+    let liveSearchVerified = false;
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const [catalogCount, liveSearchCount] = await Promise.all([
+        detector.getCatalogCount(allSkus),
+        detector.getLiveSearchCount()
+      ]);
+      
+      catalogVerified = catalogCount === totalExpected;
+      liveSearchVerified = liveSearchCount === totalExpected;
+      
+      if (catalogVerified && liveSearchVerified) {
+        console.log(`✅ Catalog Service: ${catalogCount}/${totalExpected} products`);
+        console.log(`✅ Live Search: ${liveSearchCount}/${totalExpected} products`);
+        break;
+      }
+      
+      // Show progress
+      const catalogStatus = catalogVerified ? '✅' : `⏳ ${catalogCount}/${totalExpected}`;
+      const liveSearchStatus = liveSearchVerified ? '✅' : `⏳ ${liveSearchCount}/${totalExpected}`;
+      process.stdout.write(`\r  Catalog Service: ${catalogStatus} | Live Search: ${liveSearchStatus} (attempt ${attempt}/${maxAttempts})`);
+      
+      if (attempt < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      }
+    }
+    
+    if (!catalogVerified || !liveSearchVerified) {
+      console.log('');
+      console.log('');
+      if (!catalogVerified) {
+        console.log(`⚠️  Catalog Service indexing incomplete (still processing)`);
+      }
+      if (!liveSearchVerified) {
+        console.log(`⚠️  Live Search indexing incomplete (still processing)`);
+      }
+      console.log('   Data is ingested but may take a few more minutes to be fully searchable.');
+    } else {
+      console.log('');
+    }
   }
   
   console.log('');

@@ -198,25 +198,6 @@ class ProductIngester extends BaseIngester {
         
         if (verifiedCount === skusToVerify.length) {
           progress.finish(verifiedCount, true);
-          
-          // Final sanity check: Query both Catalog Service and Live Search counts
-          const [catalogCount, liveSearchCount] = await Promise.all([
-            detector.getCatalogCount(skusToVerify),
-            detector.getLiveSearchCount()
-          ]);
-          
-          if (catalogCount === skusToVerify.length && liveSearchCount === skusToVerify.length) {
-            console.log(`✅ Catalog verified: ${catalogCount} products`);
-            console.log(`✅ Live Search verified: ${liveSearchCount} products`);
-          } else {
-            if (catalogCount !== skusToVerify.length) {
-              console.log(`⚠️  Catalog Service mismatch: expected ${skusToVerify.length}, found ${catalogCount}`);
-            }
-            if (liveSearchCount !== skusToVerify.length) {
-              console.log(`⚠️  Live Search mismatch: expected ${skusToVerify.length}, found ${liveSearchCount}`);
-            }
-          }
-          
           break;
         }
       }

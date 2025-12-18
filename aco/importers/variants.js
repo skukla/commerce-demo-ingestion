@@ -273,27 +273,6 @@ class VariantIngester extends BaseIngester {
         if (verifiedCount === skusToVerify.length) {
           progress.finish(verifiedCount, true);
           
-          // Final sanity check: Query both Catalog Service and Live Search counts
-          const expectedTotal = expectedProductCount + allVariantSkus.length; // Products + Variants
-          const allSkus = [...products.map(p => p.sku), ...allVariantSkus];
-          
-          const [catalogCount, liveSearchCount] = await Promise.all([
-            detector.getCatalogCount(allSkus),
-            detector.getLiveSearchCount()
-          ]);
-          
-          if (catalogCount === expectedTotal && liveSearchCount === expectedTotal) {
-            console.log(`✅ Catalog verified: ${catalogCount} products (${expectedProductCount} regular + ${allVariantSkus.length} variants)`);
-            console.log(`✅ Live Search verified: ${liveSearchCount} products`);
-          } else {
-            if (catalogCount !== expectedTotal) {
-              console.log(`⚠️  Catalog Service mismatch: expected ${expectedTotal}, found ${catalogCount}`);
-            }
-            if (liveSearchCount !== expectedTotal) {
-              console.log(`⚠️  Live Search mismatch: expected ${expectedTotal}, found ${liveSearchCount}`);
-            }
-          }
-          
           break;
         }
       }
