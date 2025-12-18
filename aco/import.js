@@ -164,26 +164,24 @@ async function ingestAll() {
       catalogVerified = catalogCount === totalExpected;
       liveSearchVerified = liveSearchCount === totalExpected;
       
-      if (catalogVerified && liveSearchVerified) {
-        console.log(`✅ Catalog Service: ${catalogCount}/${totalExpected} products`);
-        console.log(`✅ Live Search: ${liveSearchCount}/${totalExpected} products`);
-        break;
-      }
-      
-      // Show progress
+      // Show progress on separate lines
       const catalogStatus = catalogVerified ? '✅' : `⏳ ${catalogCount}/${totalExpected}`;
       const liveSearchStatus = liveSearchVerified ? '✅' : `⏳ ${liveSearchCount}/${totalExpected}`;
-      process.stdout.write(`\r  Catalog Service: ${catalogStatus} | Live Search: ${liveSearchStatus} (attempt ${attempt}/${maxAttempts})`);
+      console.log(`  Catalog Service: ${catalogStatus}`);
+      console.log(`  Live Search: ${liveSearchStatus}`);
+      
+      if (catalogVerified && liveSearchVerified) {
+        break;
+      }
       
       if (attempt < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, pollInterval));
       }
     }
     
-    console.log(''); // New line after progress
+    console.log('');
     
     if (!catalogVerified || !liveSearchVerified) {
-      console.log('');
       if (!catalogVerified) {
         console.log(`⚠️  Catalog Service indexing incomplete (still processing)`);
       }
