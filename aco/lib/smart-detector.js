@@ -157,15 +157,25 @@ export class SmartDetector {
         }
       `;
 
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'AC-Environment-Id': this.acoConfig.tenantId,
+        'AC-Source-Locale': 'en-US',
+        'AC-Price-Book-Id': 'US-Retail'
+      };
+      
+      // Add optional headers if available
+      if (this.acoConfig.catalogViewId) {
+        headers['AC-View-Id'] = this.acoConfig.catalogViewId;
+      }
+      if (this.acoConfig.websiteCode) {
+        headers['Magento-Website-Code'] = this.acoConfig.websiteCode;
+      }
+      
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'AC-Environment-Id': this.acoConfig.tenantId,
-          'AC-Source-Locale': 'en-US',
-          'AC-Price-Book-Id': 'US-Retail'
-        },
+        headers,
         body: JSON.stringify({ query })
       });
 

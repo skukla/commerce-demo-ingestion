@@ -174,10 +174,6 @@ class VariantIngester extends BaseIngester {
       const BATCH_SIZE = 100;
       const totalBatches = Math.ceil(childrenToIngest.length / BATCH_SIZE);
       
-      // Always show progress bar for visibility
-      const progress = new PollingProgress('Ingesting variants', childrenToIngest.length);
-      let ingestedCount = 0;
-      
       for (let i = 0; i < childrenToIngest.length; i += BATCH_SIZE) {
         const batch = childrenToIngest.slice(i, i + BATCH_SIZE);
         const batchNum = Math.floor(i / BATCH_SIZE) + 1;
@@ -193,9 +189,6 @@ class VariantIngester extends BaseIngester {
             this.results.addCreated({ sku: child.sku, name: child.name });
           });
           
-          ingestedCount += batch.length;
-          progress.update(ingestedCount, batchNum, totalBatches);
-          
         } catch (error) {
           this.logger.error(`Failed to ingest variant batch ${batchNum}/${totalBatches}: ${error.message}`);
           if (error.response) {
@@ -208,10 +201,6 @@ class VariantIngester extends BaseIngester {
             this.results.addFailed({ sku: child.sku, name: child.name }, error);
           });
         }
-      }
-      
-      if (progress) {
-        progress.finish(ingestedCount, true);
       }
     }
     

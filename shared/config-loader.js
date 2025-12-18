@@ -105,6 +105,8 @@ export const COMMERCE_CONFIG = {
     environment: process.env.ACO_ENVIRONMENT || 'sandbox',
     clientId: process.env.ACO_CLIENT_ID,
     clientSecret: process.env.ACO_CLIENT_SECRET,
+    catalogViewId: process.env.ACO_CATALOG_VIEW_ID,
+    websiteCode: process.env.ACO_WEBSITE_CODE || PROJECT_CONFIG.websiteCode,
     timeoutMs: parseInt(process.env.ACO_TIMEOUT_MS || '10000', 10)
   }
 };

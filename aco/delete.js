@@ -5,7 +5,7 @@
  * Deletes all ACO entities from the data pack in the correct reverse dependency order:
  * 1. Prices (references products + price books)
  * 2. Price Books
- * 3. Products (simple + variants + bundles, reference categories)
+YE * 3. Products (simple + variants + bundles, reference categories)
  * 4. Categories (referenced by products)
  * 5. Metadata (product attributes)
  * 
