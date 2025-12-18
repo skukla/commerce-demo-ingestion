@@ -5,8 +5,9 @@
  * Deletes all ACO entities from the data pack in the correct reverse dependency order:
  * 1. Prices (references products + price books)
  * 2. Price Books
- * 3. Products (simple + variants + bundles)
- * 4. Metadata (product attributes)
+ * 3. Products (simple + variants + bundles, reference categories)
+ * 4. Categories (referenced by products)
+ * 5. Metadata (product attributes)
  * 
  * Strategy: Reads the data pack files directly and deletes all SKUs/IDs from those files.
  * This is simpler and more reliable than scanning or state tracking.
@@ -23,7 +24,8 @@ import {
   deleteAllPricesForPriceBooks,
   deletePriceBooks,
   deleteProductsBySKUs,
-  deleteMetadata
+  deleteMetadata,
+  deleteCategories
 } from './lib/aco-delete.js';
 import { COMMERCE_CONFIG, DATA_REPO_PATH } from '../shared/config-loader.js';
 import { loadJSON } from './lib/aco-helpers.js';
@@ -55,6 +57,7 @@ async function resetAll() {
     prices: null,
     priceBooks: null,
     products: null,
+    categories: null,
     metadata: null
   };
   
@@ -64,6 +67,7 @@ async function resetAll() {
     
     let skus = [];
     let priceBookIds = [];
+    let categorySlugs = [];
     let metadataCodes = [];
     
     try {
@@ -75,6 +79,10 @@ async function resetAll() {
       // Load price books
       const priceBooks = await loadJSON('price-books.json', DATA_REPO_PATH, 'price-books');
       priceBookIds = priceBooks.map(pb => pb.priceBookId);
+      
+      // Load categories
+      const categories = await loadJSON('categories.json', DATA_REPO_PATH, 'categories');
+      categorySlugs = categories.map(c => c.slug);
       
       // Load metadata
       const metadata = await loadJSON('metadata.json', DATA_REPO_PATH, 'metadata');
@@ -96,7 +104,7 @@ async function resetAll() {
     }
     
     // Check if there's anything to delete
-    if (skus.length === 0 && priceBookIds.length === 0 && metadataCodes.length === 0) {
+    if (skus.length === 0 && priceBookIds.length === 0 && categorySlugs.length === 0 && metadataCodes.length === 0) {
       updateLine(chalk.green('✔ No data in data pack'));
       finishLine();
       
@@ -113,6 +121,7 @@ async function resetAll() {
     const foundItems = [];
     if (skus.length > 0) foundItems.push(`${skus.length} products`);
     if (priceBookIds.length > 0) foundItems.push(`${priceBookIds.length} price books`);
+    if (categorySlugs.length > 0) foundItems.push(`${categorySlugs.length} categories`);
     if (metadataCodes.length > 0) foundItems.push(`${metadataCodes.length} metadata attributes`);
     
     updateLine(chalk.green(`✔ Loaded data pack: ${foundItems.join(', ')}`));
@@ -243,7 +252,16 @@ async function resetAll() {
       results.products = deleteResult;
     }
     
-    // Step 4: Delete Metadata (last, after all products are deleted)
+    // Step 4: Delete Categories (after products, before metadata)
+    if (categorySlugs.length > 0) {
+      results.categories = await deleteCategories(categorySlugs, { dryRun });
+      if (results.categories.deleted > 0) {
+        console.log(chalk.green(`✔ Deleted ${results.categories.deleted} categories`));
+      }
+      
+    }
+    
+    // Step 5: Delete Metadata (last, after all products and categories are deleted)
     if (!skipProducts && metadataCodes.length > 0) {
       results.metadata = await deleteMetadata(metadataCodes, { dryRun });
       if (results.metadata.deleted > 0) {

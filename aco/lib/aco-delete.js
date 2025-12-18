@@ -374,11 +374,80 @@ export async function deleteMetadata(attributeCodes, options = {}) {
   };
 }
 
+/**
+ * Delete categories by slugs
+ * 
+ * @param {string[]} slugs - Array of category slugs to delete
+ * @param {Object} options - Delete options
+ * @param {string} [options.locale='en-US'] - Locale for deletion
+ * @param {number} [options.batchSize=50] - Batch size for deletion
+ * @param {boolean} [options.dryRun=false] - Preview mode
+ * @returns {Promise<Object>} Deletion result
+ * 
+ * @example
+ * const result = await deleteCategories(['structural-materials', 'roofing']);
+ */
+export async function deleteCategories(slugs, options = {}) {
+  const { locale = 'en-US', batchSize = 50, dryRun = false } = options;
+  
+  logger.debug('Delete Categories Operation', {
+    count: slugs.length,
+    locale,
+    dryRun
+  });
+  
+  if (dryRun) {
+    logger.debug('[DRY-RUN] Would delete categories:', slugs.slice(0, 10));
+    return { deleted: 0, total: slugs.length, dryRun: true };
+  }
+  
+  const client = getACOClient();
+  const categoryDeletes = slugs.map(slug => ({
+    slug,
+    source: { locale }
+  }));
+  
+  logger.debug(`Deleting ${categoryDeletes.length} categories across ${Math.ceil(categoryDeletes.length / batchSize)} batches...`);
+  
+  let deletedCount = 0;
+  const errors = [];
+  
+  // Process in batches
+  for (let i = 0; i < categoryDeletes.length; i += batchSize) {
+    const batch = categoryDeletes.slice(i, i + batchSize);
+    const batchNum = Math.floor(i / batchSize) + 1;
+    
+    try {
+      const response = await client.deleteCategories(batch);
+      const accepted = response.data?.acceptedCount || 0;
+      deletedCount += accepted;
+      
+    } catch (error) {
+      logger.error(`Batch ${batchNum} failed:`, error.message);
+      errors.push({
+        batch: batchNum,
+        error: error.message,
+        items: batch.length
+      });
+    }
+  }
+  
+  logger.debug(`Category deletion complete: ${deletedCount}/${slugs.length} deleted`);
+  
+  return {
+    deleted: deletedCount,
+    total: slugs.length,
+    errors,
+    success: errors.length === 0
+  };
+}
+
 export default {
   deletePricesBySKUs,
   deleteAllPricesForPriceBooks,
   deletePriceBooks,
   deleteProductsBySKUs,
-  deleteMetadata
+  deleteMetadata,
+  deleteCategories
 };
 
