@@ -97,21 +97,46 @@ class ProductIngester extends BaseIngester {
     // Initialize ACO client
     const client = await this.getClient();
     
-    // Ingest with retry
-    for (const product of toIngest) {
+    // Ingest in batches (ACO supports up to 100 products per request)
+    const BATCH_SIZE = 100;
+    const totalBatches = Math.ceil(toIngest.length / BATCH_SIZE);
+    
+    // Show progress bar if not silent
+    const progress = !this.silent ? new PollingProgress('Ingesting products', toIngest.length) : null;
+    let ingestedCount = 0;
+    
+    for (let i = 0; i < toIngest.length; i += BATCH_SIZE) {
+      const batch = toIngest.slice(i, i + BATCH_SIZE);
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+      
       try {
         await withRetry(async () => {
-          await client.createProducts([product]); // ACO expects array
+          await client.createProducts(batch);
         }, {
-          name: `Ingest product ${product.sku}`
+          name: `Ingest product batch ${batchNum}/${totalBatches}`
         });
         
-        // Track temporarily (will verify via polling)
-        this.results.addCreated({ sku: product.sku, name: product.name });
+        // Track all products in batch
+        batch.forEach(product => {
+          this.results.addCreated({ sku: product.sku, name: product.name });
+        });
+        
+        ingestedCount += batch.length;
+        if (progress) {
+          progress.update(ingestedCount, batchNum, totalBatches);
+        }
+        
       } catch (error) {
-        this.logger.error(`Failed to ingest ${product.sku}: ${error.message}`);
-        this.results.addFailed({ sku: product.sku, name: product.name }, error);
+        this.logger.error(`Failed to ingest batch ${batchNum}/${totalBatches}: ${error.message}`);
+        // Mark all products in failed batch as failed
+        batch.forEach(product => {
+          this.results.addFailed({ sku: product.sku, name: product.name }, error);
+        });
       }
+    }
+    
+    if (progress) {
+      progress.finish(ingestedCount, true);
     }
     
     // Poll ACO to verify ingestion
@@ -125,8 +150,8 @@ class ProductIngester extends BaseIngester {
       const skusToVerify = this.results.created.map(p => p.sku);
       
       const progress = new PollingProgress('Verifying products', skusToVerify.length);
-      const maxAttempts = 60; // 10 minutes max
-      const pollInterval = 10000; // 10 seconds
+      const maxAttempts = 120; // 10 minutes max (120 * 5s = 600s)
+      const pollInterval = 5000; // 5 seconds (faster polling for smoother progress)
       let attempt = 0;
       let verifiedCount = 0;
       let indexingStarted = false;
@@ -149,7 +174,6 @@ class ProductIngester extends BaseIngester {
       
       while (attempt < maxAttempts && verifiedCount < skusToVerify.length) {
         attempt++;
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
         
         // Check remaining SKUs in batches
         const foundProducts = await checkInBatches(remainingSkus);
@@ -167,8 +191,32 @@ class ProductIngester extends BaseIngester {
         // Update progress bar once per poll
         progress.update(verifiedCount, attempt, maxAttempts);
         
+        // Wait before next poll (unless we're done)
+        if (verifiedCount < skusToVerify.length) {
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+        }
+        
         if (verifiedCount === skusToVerify.length) {
           progress.finish(verifiedCount, true);
+          
+          // Final sanity check: Query both Catalog Service and Live Search counts
+          const [catalogCount, liveSearchCount] = await Promise.all([
+            detector.getCatalogCount(skusToVerify),
+            detector.getLiveSearchCount()
+          ]);
+          
+          if (catalogCount === skusToVerify.length && liveSearchCount === skusToVerify.length) {
+            console.log(`✅ Catalog verified: ${catalogCount} products`);
+            console.log(`✅ Live Search verified: ${liveSearchCount} products`);
+          } else {
+            if (catalogCount !== skusToVerify.length) {
+              console.log(`⚠️  Catalog Service mismatch: expected ${skusToVerify.length}, found ${catalogCount}`);
+            }
+            if (liveSearchCount !== skusToVerify.length) {
+              console.log(`⚠️  Live Search mismatch: expected ${skusToVerify.length}, found ${liveSearchCount}`);
+            }
+          }
+          
           break;
         }
       }
@@ -180,6 +228,7 @@ class ProductIngester extends BaseIngester {
         } else {
           this.logger.warn(`Only ${verifiedCount}/${skusToVerify.length} products verified in ACO`);
         }
+        this.logger.error(`❌ Verification incomplete`);
       }
     }
     

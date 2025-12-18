@@ -139,6 +139,91 @@ export class SmartDetector {
   }
 
   /**
+   * Get total count from Live Search (productSearch API)
+   * This uses the search index, which may lag behind Catalog Service
+   * 
+   * @returns {Promise<number>} Total count from Live Search
+   */
+  async getLiveSearchCount() {
+    try {
+      const token = await this.getAccessToken();
+      const endpoint = this.getACOEndpoint();
+
+      const query = `
+        query {
+          productSearch(phrase: "", page_size: 1) {
+            total_count
+          }
+        }
+      `;
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'AC-Environment-Id': this.acoConfig.tenantId,
+          'AC-Source-Locale': 'en-US',
+          'AC-Price-Book-Id': 'US-Retail'
+        },
+        body: JSON.stringify({ query })
+      });
+
+      if (!response.ok) {
+        logger.debug(`Live Search count query failed with status ${response.status}`);
+        return 0;
+      }
+
+      const result = await response.json();
+      
+      if (result.errors) {
+        logger.debug(`Live Search count query returned errors: ${JSON.stringify(result.errors)}`);
+        return 0;
+      }
+
+      const totalCount = result.data?.productSearch?.total_count || 0;
+      return totalCount;
+      
+    } catch (error) {
+      logger.debug(`Failed to get Live Search count: ${error.message}`);
+      return 0;
+    }
+  }
+
+  /**
+   * Get total count of visible products in the catalog
+   * Alias for getLiveSearchCount for backward compatibility
+   * 
+   * @returns {Promise<number>} Total count of visible products
+   */
+  async getTotalProductCount() {
+    return this.getLiveSearchCount();
+  }
+  
+  /**
+   * Get catalog count by verifying how many SKUs exist
+   * This queries Catalog Service directly (not the search index)
+   * 
+   * @param {Array<string>} skus - SKUs to verify
+   * @returns {Promise<number>} Number of SKUs found in Catalog Service
+   */
+  async getCatalogCount(skus) {
+    if (!skus || skus.length === 0) return 0;
+    
+    // Query in batches
+    const BATCH_SIZE = 50;
+    let foundCount = 0;
+    
+    for (let i = 0; i < skus.length; i += BATCH_SIZE) {
+      const batch = skus.slice(i, i + BATCH_SIZE);
+      const found = await this.queryACOProductsBySKUs(batch, false);
+      foundCount += found.length;
+    }
+    
+    return foundCount;
+  }
+
+  /**
    * Query ACO products directly via productSearch (only returns VISIBLE products)
    * Note: Invisible variants (visibleIn: []) will NOT be returned
    * 

@@ -228,37 +228,11 @@ export function getACOUIUrl() {
  * const response = await createCategories(categories);
  */
 export async function createCategories(categories) {
+  // Use SDK's built-in createCategories method
   const client = getACOClient();
+  logger.debug(`Creating ${categories.length} categories via ACO SDK`);
   
-  // Check if SDK has native createCategories method
-  if (typeof client.createCategories === 'function') {
-    logger.debug('Using SDK native createCategories method');
-    return await client.createCategories(categories);
-  }
-  
-  // Check if SDK exposes raw HTTP methods (post/request)
-  if (typeof client.post === 'function') {
-    logger.debug('Using SDK post method for categories');
-    return await client.post('/v1/catalog/categories', categories);
-  }
-  
-  // If SDK has a generic request method
-  if (typeof client.request === 'function') {
-    logger.debug('Using SDK request method for categories');
-    return await client.request({
-      method: 'POST',
-      url: '/v1/catalog/categories',
-      data: categories
-    });
-  }
-  
-  // Fallback error - SDK doesn't support the required methods
-  logger.error('ACO SDK does not support category creation methods');
-  throw new Error(
-    'ACO SDK does not support category creation. ' +
-    'Available methods: ' + Object.keys(client).join(', ') + '. ' +
-    'Please check the SDK version (@adobe-commerce/aco-ts-sdk) or use the Data Ingestion API directly.'
-  );
+  return await client.createCategories(categories);
 }
 
 /**

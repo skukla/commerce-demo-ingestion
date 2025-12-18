@@ -7,6 +7,7 @@
 import { updateLine, finishLine } from '../shared/progress.js';
 import { format } from '../shared/format.js';
 import { formatDuration } from './lib/aco-ingest-helpers.js';
+import { COMMERCE_CONFIG } from '../shared/config-loader.js';
 import chalk from 'chalk';
 
 // Import ingestion functions
@@ -31,6 +32,7 @@ async function executeIngestionStep(stepName, ingestFn, options = {}) {
   updateLine(`📦 Ingesting ${stepName.toLowerCase()}...`);
   
   // Add silent flag to context to suppress verbose logs
+  // Progress bars will still show as they write directly to console
   const contextWithSilent = { ...context, silent: true, dryRun };
   
   const result = await ingestFn(contextWithSilent);
@@ -65,8 +67,11 @@ async function executeIngestionStep(stepName, ingestFn, options = {}) {
 async function ingestAll() {
   const startTime = Date.now();
   
+  const acoTarget = `ACO ${COMMERCE_CONFIG.aco.region}/${COMMERCE_CONFIG.aco.environment} (${COMMERCE_CONFIG.aco.tenantId})`;
+  
   console.log('');
   console.log(format.muted(`Mode: ${dryRun ? 'DRY RUN (no changes will be made)' : 'LIVE'}`));
+  console.log(format.muted(`Target: ${acoTarget}`));
   console.log('');
   
   // Clear state tracker to ensure fresh ingestion (silent)
@@ -112,7 +117,8 @@ async function ingestAll() {
       return { success: false, results };
     }
     
-    // Step 4: Variants
+    // Step 4: Variants (import visible, verify, toggle to invisible)
+    // Note: Variants must be generated as visible (default behavior in generator)
     results.variants = await executeIngestionStep('variants', ingestVariants, { context: {} });
     
     // Step 5: Price Books

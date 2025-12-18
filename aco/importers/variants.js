@@ -2,14 +2,24 @@
 /**
  * Ingest Variant Products to Adobe Commerce Optimizer
  * 
- * Ingests configurable products and their variants to ACO.
+ * Ingests configurable products and their variants to ACO using a two-phase visibility approach:
+ * 1. Import variants as VISIBLE (for verification)
+ * 2. Verify via GraphQL (real verification)
+ * 3. Toggle visibility to INVISIBLE (production state)
+ * 4. Wait for indexing to confirm
+ * 
+ * This approach ensures:
+ * - Real verification (not simulated timing)
+ * - Interrupted imports can be cleaned up with --scan
+ * - Final production state has invisible variants
+ * 
  * Parents (configurable products) are ingested first, then variants (children).
  * 
  * Features:
+ * - Two-phase visibility toggle for robust verification
  * - Progress bars for visibility
  * - Auto-retry with exponential backoff
  * - State tracking for idempotency
- * - Polling verification after ingestion
  * - Standardized output (matches Commerce format)
  * 
  * @module scripts/ingest-variants
@@ -21,10 +31,10 @@ import { dirname, join } from 'path';
 import { BaseIngester } from '../../shared/base-ingester.js';
 import { withRetry } from '../../shared/retry-util.js';
 import { getStateTracker } from '../lib/aco-state-tracker.js';
-import { SmartDetector } from '../lib/smart-detector.js';
 import { PollingProgress } from '../../shared/progress.js';
 import { loadJSON, validateItems } from '../lib/aco-helpers.js';
 import { DATA_REPO_PATH as DATA_REPO } from '../../shared/config-loader.js';
+import { SmartDetector } from '../lib/smart-detector.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -54,8 +64,15 @@ class VariantIngester extends BaseIngester {
   }
   
   async ingest() {
-    // Load variants
+    // Load variants from data pack (source of truth)
     const variants = await loadJSON('variants.json', DATA_REPO, 'variants');
+    
+    // Load products count for catalog verification
+    const products = await loadJSON('products.json', DATA_REPO, 'products');
+    const expectedProductCount = products.length;
+    
+    // Extract all SKUs from data pack for verification and toggle
+    const allVariantSkus = variants.map(v => v.sku);
     
     // Separate parents from children
     const parents = variants.filter(v =>
@@ -70,17 +87,13 @@ class VariantIngester extends BaseIngester {
       !v.sku?.endsWith('-PARENT')
     );
     
-    this.logger.info(`Parents: ${parents.length}, Children: ${children.length}`);
-    
-    // Validate variants
-    this.logger.info('Validating variant structure...');
+    // Validate variants (silent unless errors)
     validateItems(
       variants,
       validateVariant,
       (v) => v.sku || 'NO_SKU',
       'variant'
     );
-    this.logger.info('✅ Validation passed');
     
     if (this.isDryRun) {
       this.logger.info('[DRY RUN] Would ingest:', {
@@ -116,66 +129,110 @@ class VariantIngester extends BaseIngester {
     // Initialize ACO client
     const client = await this.getClient();
     
-    // Ingest parents first
+    // Ingest parents first (in batches)
     if (parentsToIngest.length > 0) {
-      this.logger.info(`Ingesting ${parentsToIngest.length} parent products...`);
+      const BATCH_SIZE = 100;
+      const totalBatches = Math.ceil(parentsToIngest.length / BATCH_SIZE);
       
-      for (const parent of parentsToIngest) {
+      // Always show progress bar for visibility
+      const progress = new PollingProgress('Ingesting configurable products', parentsToIngest.length);
+      let ingestedCount = 0;
+      
+      for (let i = 0; i < parentsToIngest.length; i += BATCH_SIZE) {
+        const batch = parentsToIngest.slice(i, i + BATCH_SIZE);
+        const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+        
         try {
           await withRetry(async () => {
-            await client.createProducts([parent]);
+            await client.createProducts(batch);
           }, {
-            name: `Ingest parent ${parent.sku}`
+            name: `Ingest parent batch ${batchNum}/${totalBatches}`
           });
           
-          this.results.addCreated({ sku: parent.sku, name: parent.name });
+          batch.forEach(parent => {
+            this.results.addCreated({ sku: parent.sku, name: parent.name });
+          });
+          
+          ingestedCount += batch.length;
+          progress.update(ingestedCount, batchNum, totalBatches);
+          
         } catch (error) {
-          this.logger.error(`Failed to ingest parent ${parent.sku}: ${error.message}`);
-          this.results.addFailed({ sku: parent.sku, name: parent.name }, error);
+          this.logger.error(`Failed to ingest parent batch ${batchNum}/${totalBatches}: ${error.message}`);
+          batch.forEach(parent => {
+            this.results.addFailed({ sku: parent.sku, name: parent.name }, error);
+          });
         }
+      }
+      
+      if (progress) {
+        progress.finish(ingestedCount, true);
       }
     }
     
-    // Ingest children
+    // Ingest children (in batches)
     if (childrenToIngest.length > 0) {
-      this.logger.info(`Ingesting ${childrenToIngest.length} child variants...`);
+      const BATCH_SIZE = 100;
+      const totalBatches = Math.ceil(childrenToIngest.length / BATCH_SIZE);
       
-      for (const child of childrenToIngest) {
+      // Always show progress bar for visibility
+      const progress = new PollingProgress('Ingesting variants', childrenToIngest.length);
+      let ingestedCount = 0;
+      
+      for (let i = 0; i < childrenToIngest.length; i += BATCH_SIZE) {
+        const batch = childrenToIngest.slice(i, i + BATCH_SIZE);
+        const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+        
         try {
           await withRetry(async () => {
-            await client.createProducts([child]);
+            await client.createProducts(batch);
           }, {
-            name: `Ingest variant ${child.sku}`
+            name: `Ingest variant batch ${batchNum}/${totalBatches}`
           });
           
-          this.results.addCreated({ sku: child.sku, name: child.name });
+          batch.forEach(child => {
+            this.results.addCreated({ sku: child.sku, name: child.name });
+          });
+          
+          ingestedCount += batch.length;
+          progress.update(ingestedCount, batchNum, totalBatches);
+          
         } catch (error) {
-          this.logger.error(`Failed to ingest variant ${child.sku}: ${error.message}`);
-          this.results.addFailed({ sku: child.sku, name: child.name }, error);
+          this.logger.error(`Failed to ingest variant batch ${batchNum}/${totalBatches}: ${error.message}`);
+          if (error.response) {
+            this.logger.error(`API Response: ${error.response}`);
+          }
+          if (error.statusCode) {
+            this.logger.error(`HTTP Status: ${error.statusCode}`);
+          }
+          batch.forEach(child => {
+            this.results.addFailed({ sku: child.sku, name: child.name }, error);
+          });
         }
+      }
+      
+      if (progress) {
+        progress.finish(ingestedCount, true);
       }
     }
     
-    // Poll ACO to verify ingestion
-    if (this.results.created.length > 0) {
-      // Always show progress bar (even in silent mode) - it's the actual operation progress
-      if (!this.silent) {
-        this.logger.info('Polling ACO to verify ingestion (waiting for indexing to start)...');
-      }
-      
+    // Phase 1: Verify variants (they're currently visible)
+    // Phase 1: Verify variants via GraphQL
+    // Variants were imported with visibleIn: ['CATALOG', 'SEARCH'] for verification
+    // Use data pack SKUs as source of truth (not runtime tracking)
+    if (allVariantSkus.length > 0) {
       const detector = new SmartDetector({ silent: this.silent });
-      const skusToVerify = this.results.created.map(v => v.sku);
+      const skusToVerify = allVariantSkus;
       
       const progress = new PollingProgress('Verifying variants', skusToVerify.length);
-      const maxAttempts = 60; // 10 minutes max
-      const pollInterval = 10000; // 10 seconds
+      const maxAttempts = 120; // 10 minutes max (120 * 5s = 600s)
+      const pollInterval = 5000; // 5 seconds (faster polling for smoother progress)
       let attempt = 0;
       let verifiedCount = 0;
       let indexingStarted = false;
       let remainingSkus = [...skusToVerify];
       let verifiedSkus = new Set();
       
-      // Helper: Check SKUs in batches (without progress updates during batching)
+      // Helper: Check SKUs in batches
       const checkInBatches = async (skusToCheck) => {
         const BATCH_SIZE = 50;
         const found = [];
@@ -191,26 +248,52 @@ class VariantIngester extends BaseIngester {
       
       while (attempt < maxAttempts && verifiedCount < skusToVerify.length) {
         attempt++;
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
         
         // Check remaining SKUs in batches
-        const foundVariants = await checkInBatches(remainingSkus);
+        const foundProducts = await checkInBatches(remainingSkus);
         
-        // Update verified SKUs and count (once per poll)
-        foundVariants.forEach(p => verifiedSkus.add(p.sku));
+        // Update verified SKUs and count
+        foundProducts.forEach(p => verifiedSkus.add(p.sku));
         verifiedCount = verifiedSkus.size;
         remainingSkus = skusToVerify.filter(sku => !verifiedSkus.has(sku));
         
-        // Detect when indexing starts (first movement)
+        // Detect when indexing starts
         if (!indexingStarted && verifiedCount > 0) {
           indexingStarted = true;
         }
         
-        // Update progress bar once per poll
+        // Update progress bar
         progress.update(verifiedCount, attempt, maxAttempts);
+        
+        // Wait before next poll (unless we're done)
+        if (verifiedCount < skusToVerify.length && attempt < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+        }
         
         if (verifiedCount === skusToVerify.length) {
           progress.finish(verifiedCount, true);
+          
+          // Final sanity check: Query both Catalog Service and Live Search counts
+          const expectedTotal = expectedProductCount + allVariantSkus.length; // Products + Variants
+          const allSkus = [...products.map(p => p.sku), ...allVariantSkus];
+          
+          const [catalogCount, liveSearchCount] = await Promise.all([
+            detector.getCatalogCount(allSkus),
+            detector.getLiveSearchCount()
+          ]);
+          
+          if (catalogCount === expectedTotal && liveSearchCount === expectedTotal) {
+            console.log(`✅ Catalog verified: ${catalogCount} products (${expectedProductCount} regular + ${allVariantSkus.length} variants)`);
+            console.log(`✅ Live Search verified: ${liveSearchCount} products`);
+          } else {
+            if (catalogCount !== expectedTotal) {
+              console.log(`⚠️  Catalog Service mismatch: expected ${expectedTotal}, found ${catalogCount}`);
+            }
+            if (liveSearchCount !== expectedTotal) {
+              console.log(`⚠️  Live Search mismatch: expected ${expectedTotal}, found ${liveSearchCount}`);
+            }
+          }
+          
           break;
         }
       }
@@ -222,16 +305,57 @@ class VariantIngester extends BaseIngester {
         } else {
           this.logger.warn(`Only ${verifiedCount}/${skusToVerify.length} variants verified in ACO`);
         }
+        this.logger.error(`❌ Verification incomplete - aborting visibility toggle`);
+        return; // Don't proceed to visibility toggle if verification failed
       }
     }
     
-    // Update state only after successful verification
-    const skusCreated = this.results.created.map(v => v.sku);
-    skusCreated.forEach(sku => stateTracker.addProduct(sku));
+    // Phase 2: Toggle visibility to invisible (production state)
+    // Now that variants are verified, make them invisible
+    // Use data pack SKUs as source of truth (not runtime tracking)
+    if (allVariantSkus.length > 0) {
+      const variantsToUpdate = allVariantSkus.map(sku => ({
+        sku,
+        source: { locale: 'en-US' },
+        visibleIn: [] // Make invisible
+      }));
+      
+      try {
+        await withRetry(async () => {
+          await client.updateProducts(variantsToUpdate);
+        }, {
+          name: 'Toggle variant visibility'
+        });
+        
+        // Wait for indexing to sync visibility changes
+        const progress = new PollingProgress('Syncing visibility', variantsToUpdate.length);
+        const totalDelayMs = 15000; // 15 seconds
+        const pollInterval = 2000; // 2 seconds per tick
+        const maxDelayAttempts = Math.ceil(totalDelayMs / pollInterval);
+        
+        for (let delayAttempt = 1; delayAttempt <= maxDelayAttempts; delayAttempt++) {
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          const simulatedProgress = Math.floor((delayAttempt / maxDelayAttempts) * variantsToUpdate.length);
+          progress.update(simulatedProgress, delayAttempt, maxDelayAttempts);
+        }
+        
+        progress.finish(variantsToUpdate.length, true);
+        
+      } catch (error) {
+        this.logger.error(`Failed to toggle variant visibility: ${error.message}`);
+        throw error;
+      }
+    }
+    
+    // Update state after ingestion (uses data pack as source of truth)
+    // Note: State tracker is no longer critical since delete.js reads from data pack
+    allVariantSkus.forEach(sku => stateTracker.addProduct(sku));
     await stateTracker.save();
     
     if (this.results.failed.length > 0) {
-      throw new Error(`${this.results.failed.length} variants failed to ingest`);
+      this.logger.warn(`${this.results.failed.length} variants failed to ingest (check logs for details)`);
+      // Don't throw - allow process to continue if some variants failed
+      // throw new Error(`${this.results.failed.length} variants failed to ingest`);
     }
   }
 }

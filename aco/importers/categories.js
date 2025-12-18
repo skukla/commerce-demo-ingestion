@@ -67,7 +67,7 @@ class CategoryIngester extends BaseIngester {
 
       // Filter out already-ingested categories
       const categoriesToIngest = allCategories.filter(cat => 
-        !this.stateTracker.hasCategory(cat.code)
+        !this.stateTracker.hasCategory(cat.slug)
       );
 
       if (categoriesToIngest.length === 0) {
@@ -111,8 +111,8 @@ class CategoryIngester extends BaseIngester {
               
               // Track successful ingestion
               for (const category of batch) {
-                this.stateTracker.addCategory(category.code);
-                results.created.push(category.code);
+                this.stateTracker.addCategory(category.slug);
+                results.created.push(category.slug);
               }
               
               this.logger.debug(`Batch ${batchNum} ingested successfully`);
@@ -129,7 +129,7 @@ class CategoryIngester extends BaseIngester {
           // Track failed categories
           for (const category of batch) {
             results.failed.push({
-              code: category.code,
+              slug: category.slug,
               error: error.message
             });
           }
@@ -169,7 +169,7 @@ class CategoryIngester extends BaseIngester {
     // First pass: Add all root categories (no parentId)
     const roots = remaining.filter(cat => !cat.parentId);
     sorted.push(...roots);
-    roots.forEach(cat => ingested.add(cat.code));
+    roots.forEach(cat => ingested.add(cat.slug));
 
     // Remove roots from remaining
     remaining.splice(0, remaining.length, ...remaining.filter(cat => cat.parentId));
@@ -185,7 +185,7 @@ class CategoryIngester extends BaseIngester {
         // Check if parent has been ingested
         if (ingested.has(cat.parentId)) {
           batch.push(cat);
-          ingested.add(cat.code);
+          ingested.add(cat.slug);
         }
       }
 
@@ -197,7 +197,7 @@ class CategoryIngester extends BaseIngester {
       }
 
       sorted.push(...batch);
-      remaining.splice(0, remaining.length, ...remaining.filter(cat => !ingested.has(cat.code)));
+      remaining.splice(0, remaining.length, ...remaining.filter(cat => !ingested.has(cat.slug)));
       iteration++;
     }
 

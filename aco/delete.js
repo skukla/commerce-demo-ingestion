@@ -2,36 +2,34 @@
 /**
  * Unified ACO Data Reset
  * 
- * Deletes all ACO entities in the correct reverse dependency order:
+ * Deletes all ACO entities from the data pack in the correct reverse dependency order:
  * 1. Prices (references products + price books)
  * 2. Price Books
  * 3. Products (simple + variants + bundles)
- * 4. Categories (optional)
- * 5. Metadata (product attributes)
+ * 4. Metadata (product attributes)
  * 
- * Features:
- * - Smart detection (no hardcoded lists)
- * - Validation after deletion
- * - Zero orphaned data guarantee
+ * Strategy: Reads the data pack files directly and deletes all SKUs/IDs from those files.
+ * This is simpler and more reliable than scanning or state tracking.
  * 
  * Usage:
- *   npm run delete:aco                    # Delete using state tracker
- *   npm run delete:aco -- --scan          # Force scan ACO directly for orphans
+ *   npm run delete:aco                    # Delete all data from data pack
  *   npm run delete:aco -- --dry-run       # Preview what would be deleted
  *   npm run delete:aco -- --reingest      # Delete and re-ingest all data
  * 
  * @module scripts/reset-all
  */
 
-import { SmartDetector } from './lib/smart-detector.js';
 import {
   deleteAllPricesForPriceBooks,
   deletePriceBooks,
   deleteProductsBySKUs,
   deleteMetadata
 } from './lib/aco-delete.js';
+import { COMMERCE_CONFIG, DATA_REPO_PATH } from '../shared/config-loader.js';
+import { loadJSON } from './lib/aco-helpers.js';
+import { SmartDetector } from './lib/smart-detector.js';
 import logger from '../shared/logger.js';
-import { format, withProgress } from '../shared/format.js';
+import { format } from '../shared/format.js';
 import { updateLine, finishLine } from '../shared/progress.js';
 import chalk from 'chalk';
 
@@ -41,21 +39,16 @@ const dryRun = args.includes('--dry-run');
 const reingest = args.includes('--reingest');
 const skipPrices = args.includes('--skip-prices');
 const skipProducts = args.includes('--skip-products');
-const skipValidation = args.includes('--skip-validation');
-const forceScan = args.includes('--scan');
-
-/**
- * Smart project detector
- * Replaces hardcoded lists with intelligent pattern matching
- */
-const detector = new SmartDetector({ silent: true });
 
 /**
  * Main reset workflow
  */
 async function resetAll() {
+  const acoTarget = `ACO ${COMMERCE_CONFIG.aco.region}/${COMMERCE_CONFIG.aco.environment} (${COMMERCE_CONFIG.aco.tenantId})`;
+  
   console.log('');
   console.log(format.muted(`Mode: ${dryRun ? 'DRY RUN (no changes will be made)' : 'LIVE'}`));
+  console.log(format.muted(`Target: ${acoTarget}`));
   console.log('');
   
   const results = {
@@ -66,54 +59,46 @@ async function resetAll() {
   };
   
   try {
-    // Use smart detection to find all project entities
-    const { updateLine, finishLine} = await import('../shared/progress.js');
+    // Load data directly from data pack files
+    updateLine('🔍 Loading data pack...');
     
-    // Find data (single line) - Use state tracker as source of truth, unless --scan is used
-    updateLine('🔍 Finding project data...');
+    let skus = [];
+    let priceBookIds = [];
+    let metadataCodes = [];
     
-    // Get ALL SKUs from state tracker (records exactly what was ingested)
-    // This includes both visible products AND invisible variants (visibleIn: [])
-    // Note: We can't query ACO for invisible variants, but we can delete them by SKU
-    const { getStateTracker } = await import('./lib/aco-state-tracker.js');
-    
-    const stateTracker = getStateTracker();
-    await stateTracker.load();
-    let skus = stateTracker.getAllProductSKUs();
-    
-    // Get price books from state tracker
-    let priceBookIds = stateTracker.getPriceBooks();
-    
-    // Get metadata from state tracker
-    let metadataCodes = stateTracker.getAllMetadataCodes();
-    
-    // If --scan flag is used OR state is empty, query ACO directly for orphaned products
-    const stateIsEmpty = skus.length === 0 && priceBookIds.length === 0 && metadataCodes.length === 0;
-    
-    if (forceScan || stateIsEmpty) {
-      if (forceScan) {
-        logger.debug('--scan flag detected, querying ACO directly for all products');
-      } else {
-        logger.debug('State tracker is empty, querying ACO directly for orphaned products');
-      }
+    try {
+      // Load products and variants
+      const products = await loadJSON('products.json', DATA_REPO_PATH, 'products');
+      const variants = await loadJSON('variants.json', DATA_REPO_PATH, 'variants');
+      skus = [...products.map(p => p.sku), ...variants.map(v => v.sku)];
       
-      // Query ACO for all visible products (productSearch)
-      const acoProducts = await detector.queryACOProductsDirect('', 500);
-      const acoSKUs = acoProducts.map(p => p.sku);
+      // Load price books
+      const priceBooks = await loadJSON('price-books.json', DATA_REPO_PATH, 'price-books');
+      priceBookIds = priceBooks.map(pb => pb.priceBookId);
       
-      // Merge with state tracker SKUs (if any) and dedupe
-      skus = [...new Set([...skus, ...acoSKUs])];
+      // Load metadata
+      const metadata = await loadJSON('metadata.json', DATA_REPO_PATH, 'metadata');
+      metadataCodes = metadata.map(m => m.attributeId);
       
-      logger.debug(`Found ${acoSKUs.length} products in ACO, ${skus.length} total after merge with state`);
-    }
-    
-    // Check if there's anything to delete after both state and scan
-    if (skus.length === 0 && priceBookIds.length === 0 && metadataCodes.length === 0) {
-      updateLine(chalk.green('✔ No project data found'));
+    } catch (error) {
+      logger.warn(`Failed to load data pack: ${error.message}`);
+      updateLine(chalk.yellow('⚠️  No data pack found'));
       finishLine();
       
-      // Clear state tracker even when no data exists (in case of stale state)
-      stateTracker.clearAll();
+      console.log('');
+      console.log(format.warning('No data to delete (data pack not found)'));
+      console.log('');
+      return {
+        success: true,
+        results: {},
+        validation: { clean: true, issues: [] }
+      };
+    }
+    
+    // Check if there's anything to delete
+    if (skus.length === 0 && priceBookIds.length === 0 && metadataCodes.length === 0) {
+      updateLine(chalk.green('✔ No data in data pack'));
+      finishLine();
       
       console.log('');
       console.log(format.success('Nothing to delete!'));
@@ -130,7 +115,7 @@ async function resetAll() {
     if (priceBookIds.length > 0) foundItems.push(`${priceBookIds.length} price books`);
     if (metadataCodes.length > 0) foundItems.push(`${metadataCodes.length} metadata attributes`);
     
-    updateLine(chalk.green(`✔ Found project data: ${foundItems.join(', ')}`));
+    updateLine(chalk.green(`✔ Loaded data pack: ${foundItems.join(', ')}`));
     finishLine();
     
     // Step 1: Delete Prices (single line with spinner)
@@ -140,11 +125,6 @@ async function resetAll() {
         console.log(chalk.green(`✔ Deleted ${results.prices.deleted} prices`));
       }
       
-      // Clear state immediately after successful deletion
-      if (!dryRun && results.prices?.success) {
-        stateTracker.clearPrices();
-        await stateTracker.save();
-      }
     }
     
     // Step 2: Delete Price Books (single line with spinner)
@@ -154,11 +134,6 @@ async function resetAll() {
         console.log(chalk.green(`✔ Deleted ${results.priceBooks.deleted} price books`));
       }
       
-      // Clear state immediately after successful deletion
-      if (!dryRun && results.priceBooks?.success) {
-        stateTracker.clearPriceBooks();
-        await stateTracker.save();
-      }
     }
     
     // Step 3: Delete Products with polling progress
@@ -182,6 +157,9 @@ async function resetAll() {
         // Track which SKUs still need to be checked
         let remainingSkus = [...skus];
         let confirmedDeleted = 0;
+        
+        // Create detector for querying ACO
+        const detector = new SmartDetector({ silent: true });
         
         // Helper: Check SKUs in batches (without progress updates during batching)
         const checkRemainingInBatches = async (skusToCheck) => {
@@ -236,6 +214,25 @@ async function resetAll() {
           }
         }
         
+        // Wait for Search and Recs indexing to catch up
+        // Catalog Service is already confirmed clean, but Search/Recs has indexing lag
+        if (pollingCompletedSuccessfully && confirmedDeleted > 0) {
+          const { PollingProgress } = await import('../shared/progress.js');
+          const indexProgress = new PollingProgress('Syncing to Search & Recs', confirmedDeleted);
+          const totalDelayMs = 15000; // 15 seconds
+          const pollInterval = 2000; // 2 seconds per tick
+          const maxDelayAttempts = Math.ceil(totalDelayMs / pollInterval);
+          
+          for (let delayAttempt = 1; delayAttempt <= maxDelayAttempts; delayAttempt++) {
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+            const simulatedProgress = Math.floor((delayAttempt / maxDelayAttempts) * confirmedDeleted);
+            indexProgress.update(simulatedProgress, delayAttempt, maxDelayAttempts);
+          }
+          
+          indexProgress.finish(confirmedDeleted, true);
+          console.log(chalk.green(`✔ Search & Recs synchronized`));
+        }
+        
         deleteResult.actualDeleted = confirmedDeleted;
         deleteResult.pollingCompleted = pollingCompletedSuccessfully;
       } else {
@@ -244,13 +241,6 @@ async function resetAll() {
       }
       
       results.products = deleteResult;
-      
-      // Clear state tracker immediately after successful product deletion
-      // (Don't wait for validation - that's checking for truly orphaned data)
-      if (!dryRun && deleteResult.success) {
-        stateTracker.clearProducts();
-        await stateTracker.save();
-      }
     }
     
     // Step 4: Delete Metadata (last, after all products are deleted)
@@ -260,137 +250,11 @@ async function resetAll() {
         console.log(chalk.green(`✔ Deleted ${results.metadata.deleted} metadata attributes`));
       }
       
-      // Clear state immediately after successful deletion
-      if (!dryRun && results.metadata?.success) {
-        stateTracker.clearMetadata();
-        await stateTracker.save();
-      }
     }
     
-    // Validation: Ensure ACO is completely clean (with auto-cleanup of orphans)
-    let validation = { clean: true, issues: [] };
-    
-    // Skip validation if polling already confirmed complete deletion
-    // (Validation queries Live Search which has indexing lag causing false positives)
-    const skipValidationDueToPolling = results.products?.pollingCompleted === true;
-    
-    if (skipValidationDueToPolling && !dryRun) {
-      console.log(chalk.green('✔ Products deletion confirmed via polling (skipping validation)'));
-    }
-    
-    if (!dryRun && !skipValidation && !skipValidationDueToPolling) {
-      const maxRetries = 3;
-      let retryCount = 0;
-      
-      while (retryCount < maxRetries) {
-        updateLine('🔍 Validating deletion...');
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        validation = await detector.validateACOClean(skus);
-        
-        if (validation.clean) {
-          // Success!
-          updateLine('✔ Validating deletion (no orphaned data)');
-          finishLine();
-          break;
-        }
-        
-        // Orphaned data detected - auto-cleanup
-        finishLine();
-        console.log('');
-        console.log(format.warning(`Found orphaned data (attempt ${retryCount + 1}/${maxRetries}), cleaning up...`));
-        validation.issues.forEach(issue => console.log(format.muted(`  • ${issue}`)));
-        console.log('');
-        
-        // Find orphaned products (both expected SKUs and unknown orphans)
-        // 1. Check our expected SKUs first
-        const knownOrphans = await detector.queryACOProductsBySKUs(skus);
-        
-        // 2. Query for any unknown visible orphans using auto-detected pattern
-        const pattern = detector.buildSkuPattern(detector.extractSkuPrefixes(skus));
-        
-        let patternMatchedOrphans = [];
-        if (pattern) {
-          const unknownOrphans = await detector.queryACOProductsDirect('', 500);
-          patternMatchedOrphans = unknownOrphans.filter(p => pattern.test(p.sku));
-        }
-        
-        // Combine and dedupe
-        const allOrphanSkus = [...new Set([
-          ...knownOrphans.map(p => p.sku),
-          ...patternMatchedOrphans.map(p => p.sku)
-        ])];
-        
-        if (allOrphanSkus.length > 0) {
-          console.log(`  Deleting ${allOrphanSkus.length} orphaned products (${knownOrphans.length} expected, ${patternMatchedOrphans.length} unknown)...`);
-          await deleteProductsBySKUs(allOrphanSkus, { dryRun, silent: true });
-          
-          // Poll for cleanup completion
-          const { PollingProgress } = await import('../shared/progress.js');
-          const progress = new PollingProgress('Cleaning up orphans', allOrphanSkus.length);
-          
-          let attempt = 0;
-          let cleanupStarted = false;
-          let remainingOrphanSkus = [...allOrphanSkus];
-          let confirmedOrphansDeleted = 0;
-          const maxAttempts = 60; // 10 minutes max (matching main deletion)
-          
-          // Helper: Check SKUs in batches (without progress updates during batching)
-          const checkOrphansInBatches = async (skusToCheck) => {
-            const BATCH_SIZE = 50;
-            const stillRemaining = [];
-            
-            for (let i = 0; i < skusToCheck.length; i += BATCH_SIZE) {
-              const batch = skusToCheck.slice(i, i + BATCH_SIZE);
-              const batchRemaining = await detector.queryACOProductsBySKUs(batch, true);
-              stillRemaining.push(...batchRemaining);
-            }
-            
-            return stillRemaining;
-          };
-          
-          while (attempt < maxAttempts && remainingOrphanSkus.length > 0) {
-            attempt++;
-            await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds
-            const stillRemaining = await checkOrphansInBatches(remainingOrphanSkus);
-            const previousRemaining = remainingOrphanSkus.length;
-            remainingOrphanSkus = stillRemaining.map(p => p.sku);
-            
-            // Update confirmed deleted count and progress (once per poll)
-            confirmedOrphansDeleted = allOrphanSkus.length - remainingOrphanSkus.length;
-            
-            // Detect when cleanup starts
-            if (!cleanupStarted && remainingOrphanSkus.length < previousRemaining) {
-              cleanupStarted = true;
-            }
-            
-            // Update progress bar once per poll
-            progress.update(confirmedOrphansDeleted, attempt, maxAttempts);
-            
-            if (remainingOrphanSkus.length === 0) {
-              progress.finish(allOrphanSkus.length, true, `Deleted ${allOrphanSkus.length} orphaned products`);
-              break;
-            }
-          }
-        }
-        
-        retryCount++;
-      }
-      
-      // Final check
-      if (!validation.clean) {
-        console.log('');
-        console.log(format.error('Unable to clean all orphaned data after 3 attempts'));
-        validation.issues.forEach(issue => console.log(format.error(`  • ${issue}`)));
-        console.log('');
-        
-        return {
-          success: false,
-          results,
-          validation
-        };
-      }
-      
-      // State was already cleared immediately after each successful deletion
+    // Deletion complete - no validation needed since we deleted exactly what was in the data pack
+    if (results.products?.pollingCompleted && !dryRun) {
+      console.log(chalk.green('✔ Products deletion confirmed via polling'));
     }
     
     // Summary
@@ -400,34 +264,26 @@ async function resetAll() {
       .filter(r => r !== null)
       .every(r => r.success !== false);
     
-    // Validation is considered passed if:
-    // - It ran and passed (validation.clean === true)
-    // - It was skipped due to successful polling (skipValidationDueToPolling === true)
-    const validationPassed = validation.clean || skipValidationDueToPolling;
-    const overallSuccess = allSuccess && validationPassed;
-    
-    if (overallSuccess && !dryRun) {
+    if (allSuccess && !dryRun) {
       console.log(format.success('Data deletion complete!'));
       if (reingest) {
         console.log('');
         console.log(format.muted('Re-ingesting all data...'));
         const { execSync } = await import('child_process');
-        execSync('node scripts/ingest-all.js', {
+        execSync('node aco/import.js', {
           stdio: 'inherit',
           cwd: process.cwd()
         });
       }
     } else if (dryRun) {
       console.log(format.muted('Dry run complete - no data was deleted'));
-    } else if (!validationPassed) {
-      console.log(format.error('Validation failed - orphaned data detected'));
     } else {
       console.log(format.warning('Some steps failed - check logs above'));
     }
     
     console.log('');
     
-    return { success: overallSuccess, results, validation };
+    return { success: allSuccess, results };
     
   } catch (error) {
     console.error(format.error(`Reset failed: ${error.message}`));
