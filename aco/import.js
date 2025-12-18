@@ -150,7 +150,7 @@ async function ingestAll() {
     const variants = await loadJSON('variants.json', DATA_REPO_PATH, 'variants');
     const allSkus = [...products.map(p => p.sku), ...variants.map(v => v.sku)];
     
-    const maxAttempts = 30; // 5 minutes max (10 second intervals)
+    const maxAttempts = 60; // 10 minutes max (10 second intervals)
     const pollInterval = 10000;
     let catalogVerified = false;
     let liveSearchVerified = false;
@@ -180,8 +180,9 @@ async function ingestAll() {
       }
     }
     
+    console.log(''); // New line after progress
+    
     if (!catalogVerified || !liveSearchVerified) {
-      console.log('');
       console.log('');
       if (!catalogVerified) {
         console.log(`⚠️  Catalog Service indexing incomplete (still processing)`);
@@ -190,8 +191,30 @@ async function ingestAll() {
         console.log(`⚠️  Live Search indexing incomplete (still processing)`);
       }
       console.log('   Data is ingested but may take a few more minutes to be fully searchable.');
-    } else {
+    }
+    
+    // Toggle variant visibility after verification (make them invisible)
+    if (results.variants && results.variants.ingested > 0 && catalogVerified && liveSearchVerified) {
       console.log('');
+      updateLine('🔄 Setting variant visibility to invisible...');
+      
+      const { getACOClient } = await import('./lib/aco-helpers.js');
+      const client = getACOClient();
+      
+      const variantsToUpdate = variants.map(v => ({
+        sku: v.sku,
+        source: { locale: 'en-US' },
+        visibleIn: [] // Make invisible
+      }));
+      
+      try {
+        await client.updateProducts(variantsToUpdate);
+        updateLine(chalk.green(`✔ Set ${variants.length} ${variants.length === 1 ? 'variant' : 'variants'} to invisible`));
+        finishLine();
+      } catch (error) {
+        updateLine(chalk.red(`✖ Failed to toggle variant visibility: ${error.message}`));
+        finishLine();
+      }
     }
   }
   
