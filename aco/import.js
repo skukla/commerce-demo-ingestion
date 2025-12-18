@@ -137,7 +137,7 @@ async function ingestAll() {
   }
   
   // Final verification: Poll until both Catalog Service and Live Search have the expected counts
-  const totalExpected = (results.products?.ingested || 0) + (results.variants?.ingested || 0);
+  const totalExpected = (results.products?.created || 0) + (results.variants?.created || 0);
   if (totalExpected > 0) {
     console.log('');
     console.log('📊 Verifying catalog indexing...');
@@ -194,7 +194,7 @@ async function ingestAll() {
     }
     
     // Toggle variant visibility after verification (make them invisible)
-    if (results.variants && results.variants.ingested > 0 && catalogVerified && liveSearchVerified) {
+    if (results.variants && results.variants.created > 0 && catalogVerified && liveSearchVerified) {
       console.log('');
       updateLine('🔄 Setting variant visibility to invisible...');
       
