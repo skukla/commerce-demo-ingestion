@@ -140,9 +140,10 @@ async function ingestAll() {
   const totalExpected = (results.products?.created || 0) + (results.variants?.created || 0);
   if (totalExpected > 0) {
     console.log('');
-    console.log('📊 Verifying catalog indexing...');
+    console.log(chalk.blue.bold('📊 Verifying catalog indexing...'));
     
     const { SmartDetector } = await import('./lib/smart-detector.js');
+    const { PollingProgress } = await import('../shared/progress.js');
     const detector = new SmartDetector(COMMERCE_CONFIG);
     
     // Load product and variant SKUs for verification
@@ -150,27 +151,20 @@ async function ingestAll() {
     const variants = await loadJSON('variants.json', DATA_REPO_PATH, 'variants');
     const allSkus = [...products.map(p => p.sku), ...variants.map(v => v.sku)];
     
+    // Phase 1: Poll Catalog Service until all records are indexed
+    const catalogProgress = new PollingProgress('Catalog Service', totalExpected);
     const maxAttempts = 60; // 10 minutes max (10 second intervals)
     const pollInterval = 10000;
     let catalogVerified = false;
-    let liveSearchVerified = false;
     
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const [catalogCount, liveSearchCount] = await Promise.all([
-        detector.getCatalogCount(allSkus),
-        detector.getLiveSearchCount()
-      ]);
-      
+      const catalogCount = await detector.getCatalogCount(allSkus);
       catalogVerified = catalogCount === totalExpected;
-      liveSearchVerified = liveSearchCount === totalExpected;
       
-      // Show progress on separate lines
-      const catalogStatus = catalogVerified ? '✅' : `⏳ ${catalogCount}/${totalExpected}`;
-      const liveSearchStatus = liveSearchVerified ? '✅' : `⏳ ${liveSearchCount}/${totalExpected}`;
-      console.log(`  Catalog Service: ${catalogStatus}`);
-      console.log(`  Live Search: ${liveSearchStatus}`);
+      catalogProgress.update(catalogCount, attempt, maxAttempts);
       
-      if (catalogVerified && liveSearchVerified) {
+      if (catalogVerified) {
+        catalogProgress.finish(catalogCount, true);
         break;
       }
       
@@ -179,21 +173,44 @@ async function ingestAll() {
       }
     }
     
-    console.log('');
-    
-    if (!catalogVerified || !liveSearchVerified) {
-      if (!catalogVerified) {
-        console.log(`⚠️  Catalog Service indexing incomplete (still processing)`);
-      }
-      if (!liveSearchVerified) {
-        console.log(`⚠️  Live Search indexing incomplete (still processing)`);
-      }
+    if (!catalogVerified) {
+      catalogProgress.finish(0, false);
+      console.log(chalk.yellow('⚠️  Catalog Service indexing incomplete (still processing)'));
       console.log('   Data is ingested but may take a few more minutes to be fully searchable.');
     }
     
+    // Phase 2: Poll Live Search (only if Catalog succeeded)
+    let liveSearchVerified = false;
+    if (catalogVerified) {
+      const liveSearchProgress = new PollingProgress('Live Search', totalExpected);
+      
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const liveSearchCount = await detector.getLiveSearchCount();
+        liveSearchVerified = liveSearchCount === totalExpected;
+        
+        liveSearchProgress.update(liveSearchCount, attempt, maxAttempts);
+        
+        if (liveSearchVerified) {
+          liveSearchProgress.finish(liveSearchCount, true);
+          break;
+        }
+        
+        if (attempt < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+        }
+      }
+      
+      if (!liveSearchVerified) {
+        liveSearchProgress.finish(0, false);
+        console.log(chalk.yellow('⚠️  Live Search indexing incomplete (still processing)'));
+        console.log('   Products are in Catalog but may take a few more minutes to be searchable.');
+      }
+    }
+    
+    console.log('');
+    
     // Toggle variant visibility after verification (make them invisible)
     if (results.variants && results.variants.created > 0 && catalogVerified && liveSearchVerified) {
-      console.log('');
       updateLine('🔄 Setting variant visibility to invisible...');
       
       const { getACOClient } = await import('./lib/aco-helpers.js');
