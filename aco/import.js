@@ -139,9 +139,6 @@ async function ingestAll() {
   // Final verification: Poll Catalog Service until all records are indexed
   const totalExpected = (results.products?.created || 0) + (results.variants?.created || 0);
   if (totalExpected > 0) {
-    console.log('');
-    console.log(chalk.blue.bold('📊 Verifying catalog indexing...'));
-    
     const { SmartDetector } = await import('./lib/smart-detector.js');
     const { PollingProgress } = await import('../shared/progress.js');
     const detector = new SmartDetector(COMMERCE_CONFIG);
@@ -178,8 +175,6 @@ async function ingestAll() {
       console.log(chalk.yellow('⚠️  Catalog Service indexing incomplete (still processing)'));
       console.log('   Data is ingested but may take a few more minutes to be fully searchable.');
     }
-    
-    console.log('');
     
     // Toggle variant visibility after Catalog verification (make them invisible)
     if (results.variants && results.variants.created > 0 && catalogVerified) {
