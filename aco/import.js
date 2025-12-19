@@ -136,7 +136,7 @@ async function ingestAll() {
     return { success: false, error: error.message, results };
   }
   
-  // Final verification: Poll until both Catalog Service and Live Search have the expected counts
+  // Final verification: Poll Catalog Service until all records are indexed
   const totalExpected = (results.products?.created || 0) + (results.variants?.created || 0);
   if (totalExpected > 0) {
     console.log('');
@@ -151,7 +151,7 @@ async function ingestAll() {
     const variants = await loadJSON('variants.json', DATA_REPO_PATH, 'variants');
     const allSkus = [...products.map(p => p.sku), ...variants.map(v => v.sku)];
     
-    // Phase 1: Poll Catalog Service until all records are indexed
+    // Poll Catalog Service until all records are indexed (source of truth)
     const catalogProgress = new PollingProgress('Catalog Service', totalExpected);
     const maxAttempts = 60; // 10 minutes max (10 second intervals)
     const pollInterval = 10000;
@@ -179,38 +179,10 @@ async function ingestAll() {
       console.log('   Data is ingested but may take a few more minutes to be fully searchable.');
     }
     
-    // Phase 2: Poll Live Search (only if Catalog succeeded)
-    let liveSearchVerified = false;
-    if (catalogVerified) {
-      const liveSearchProgress = new PollingProgress('Live Search', totalExpected);
-      
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const liveSearchCount = await detector.getLiveSearchCount();
-        liveSearchVerified = liveSearchCount === totalExpected;
-        
-        liveSearchProgress.update(liveSearchCount, attempt, maxAttempts);
-        
-        if (liveSearchVerified) {
-          liveSearchProgress.finish(liveSearchCount, true);
-          break;
-        }
-        
-        if (attempt < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, pollInterval));
-        }
-      }
-      
-      if (!liveSearchVerified) {
-        liveSearchProgress.finish(0, false);
-        console.log(chalk.yellow('⚠️  Live Search indexing incomplete (still processing)'));
-        console.log('   Products are in Catalog but may take a few more minutes to be searchable.');
-      }
-    }
-    
     console.log('');
     
-    // Toggle variant visibility after verification (make them invisible)
-    if (results.variants && results.variants.created > 0 && catalogVerified && liveSearchVerified) {
+    // Toggle variant visibility after Catalog verification (make them invisible)
+    if (results.variants && results.variants.created > 0 && catalogVerified) {
       updateLine('🔄 Setting variant visibility to invisible...');
       
       const { getACOClient } = await import('./lib/aco-client.js');
