@@ -149,9 +149,11 @@ export class SmartDetector {
       const token = await this.getAccessToken();
       const endpoint = this.getACOEndpoint();
 
+      // Use productSearch with phrase "*" to get all indexed products
+      // Note: This returns ALL visible products (including variants during verification)
       const query = `
         query {
-          productSearch(phrase: "", page_size: 1) {
+          productSearch(phrase: "*", page_size: 1) {
             total_count
           }
         }
@@ -180,21 +182,27 @@ export class SmartDetector {
       });
 
       if (!response.ok) {
-        logger.debug(`Live Search count query failed with status ${response.status}`);
+        const responseText = await response.text();
+        console.log(`[DEBUG] Live Search failed (${response.status}): ${responseText}`);
+        logger.debug(`Live Search count query failed with status ${response.status}: ${responseText}`);
         return 0;
       }
 
       const result = await response.json();
       
       if (result.errors) {
+        console.log(`[DEBUG] Live Search errors:`, result.errors);
         logger.debug(`Live Search count query returned errors: ${JSON.stringify(result.errors)}`);
         return 0;
       }
 
       const totalCount = result.data?.productSearch?.total_count || 0;
+      console.log(`[DEBUG] Live Search returned total_count: ${totalCount}, full result:`, JSON.stringify(result, null, 2));
+      logger.debug(`Live Search total_count: ${totalCount}`);
       return totalCount;
       
     } catch (error) {
+      console.log(`[DEBUG] Live Search exception:`, error.message);
       logger.debug(`Failed to get Live Search count: ${error.message}`);
       return 0;
     }
