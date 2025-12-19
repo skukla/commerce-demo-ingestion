@@ -223,25 +223,6 @@ async function resetAll() {
           }
         }
         
-        // Wait for Search and Recs indexing to catch up
-        // Catalog Service is already confirmed clean, but Search/Recs has indexing lag
-        if (pollingCompletedSuccessfully && confirmedDeleted > 0) {
-          const { PollingProgress } = await import('../shared/progress.js');
-          const indexProgress = new PollingProgress('Syncing to Search & Recs', confirmedDeleted);
-          const totalDelayMs = 15000; // 15 seconds
-          const pollInterval = 2000; // 2 seconds per tick
-          const maxDelayAttempts = Math.ceil(totalDelayMs / pollInterval);
-          
-          for (let delayAttempt = 1; delayAttempt <= maxDelayAttempts; delayAttempt++) {
-            await new Promise(resolve => setTimeout(resolve, pollInterval));
-            const simulatedProgress = Math.floor((delayAttempt / maxDelayAttempts) * confirmedDeleted);
-            indexProgress.update(simulatedProgress, delayAttempt, maxDelayAttempts);
-          }
-          
-          indexProgress.finish(confirmedDeleted, true);
-          console.log(chalk.green(`✔ Search & Recs synchronized`));
-        }
-        
         deleteResult.actualDeleted = confirmedDeleted;
         deleteResult.pollingCompleted = pollingCompletedSuccessfully;
       } else {
@@ -268,11 +249,6 @@ async function resetAll() {
         console.log(chalk.green(`✔ Deleted ${results.metadata.deleted} metadata attributes`));
       }
       
-    }
-    
-    // Deletion complete - no validation needed since we deleted exactly what was in the data pack
-    if (results.products?.pollingCompleted && !dryRun) {
-      console.log(chalk.green('✔ Products deletion confirmed via polling'));
     }
     
     // Summary
