@@ -149,11 +149,11 @@ export class SmartDetector {
       const token = await this.getAccessToken();
       const endpoint = this.getACOEndpoint();
 
-      // Use productSearch with phrase "*" to get all indexed products
-      // Note: This returns ALL visible products (including variants during verification)
+      // Try using products query instead of productSearch
+      // products returns catalog products, productSearch is for search index
       const query = `
         query {
-          productSearch(phrase: "*", page_size: 1) {
+          products(pageSize: 1) {
             total_count
           }
         }
@@ -174,6 +174,9 @@ export class SmartDetector {
       if (this.acoConfig.websiteCode) {
         headers['Magento-Website-Code'] = this.acoConfig.websiteCode;
       }
+      
+      console.log(`[DEBUG] Live Search query:`, query);
+      console.log(`[DEBUG] Headers:`, JSON.stringify(headers, null, 2));
       
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -196,7 +199,7 @@ export class SmartDetector {
         return 0;
       }
 
-      const totalCount = result.data?.productSearch?.total_count || 0;
+      const totalCount = result.data?.products?.total_count || 0;
       console.log(`[DEBUG] Live Search returned total_count: ${totalCount}, full result:`, JSON.stringify(result, null, 2));
       logger.debug(`Live Search total_count: ${totalCount}`);
       return totalCount;
