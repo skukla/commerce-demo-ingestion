@@ -213,7 +213,7 @@ async function ingestAll() {
     if (results.variants && results.variants.created > 0 && catalogVerified && liveSearchVerified) {
       updateLine('🔄 Setting variant visibility to invisible...');
       
-      const { getACOClient } = await import('./lib/aco-helpers.js');
+      const { getACOClient } = await import('./lib/aco-client.js');
       const client = getACOClient();
       
       const variantsToUpdate = variants.map(v => ({
