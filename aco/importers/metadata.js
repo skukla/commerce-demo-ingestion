@@ -80,6 +80,21 @@ function getSearchWeight(attr) {
 }
 
 /**
+ * Determines if an attribute should be sortable
+ * Only name and price are sortable by default; custom br_* attributes are not
+ */
+function isSortable(attr) {
+  // Respect explicit sortable property if defined in source
+  if (typeof attr.sortable === 'boolean') {
+    return attr.sortable;
+  }
+
+  // Only native name and price attributes are sortable
+  const sortableAttributes = ['name', 'price'];
+  return sortableAttributes.includes(attr.attributeId);
+}
+
+/**
  * Transform metadata to ACO Metadata API format
  */
 function transformToACOMetadata(metadata) {
@@ -90,7 +105,7 @@ function transformToACOMetadata(metadata) {
     dataType: DATA_TYPE_MAP[attr.type] || 'TEXT',
     visibleIn: getVisibilitySettings(attr),
     filterable: attr.type === 'select' || attr.type === 'multiselect' || attr.type === 'boolean',
-    sortable: attr.type === 'select' || attr.type === 'number' || attr.type === 'date',
+    sortable: isSortable(attr),
     searchable: true,
     searchWeight: getSearchWeight(attr),
     searchTypes: ['AUTOCOMPLETE'],

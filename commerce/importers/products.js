@@ -189,7 +189,7 @@ class ProductImporter extends BaseImporter {
     this.existingSkus = allSkus;
     
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    this.logger.success(`Pre-fetched ${allSkus.size} existing SKUs in ${duration}s`);
+    this.logger.info(`✔ Pre-fetched ${allSkus.size} existing SKUs in ${duration}s`);
   }
   
   /**
@@ -343,20 +343,37 @@ class ProductImporter extends BaseImporter {
   
   /**
    * Get category links from category path string
+   *
+   * ALL products are assigned to the "All Products" category in addition to
+   * their specific category. This enables browsing all products via /catalog?category=all-products
    */
   getCategoryLinks(categoryPath) {
-    if (!categoryPath) return [];
-    
+    const links = [];
+
+    // Always add "All Products" category first (position 0)
+    // This ensures all products appear in the all-products category page
+    const allProductsCategoryId = this.categoryMap['all-products'] || this.categoryMap['All Products'];
+    if (allProductsCategoryId) {
+      links.push({ category_id: allProductsCategoryId, position: 0 });
+    }
+
+    if (!categoryPath) return links;
+
     // categoryPath is like "Root Catalog/Structural Materials"
     // We need to find the category ID from the map
     const categoryId = this.categoryMap[categoryPath] || this.categoryMap[categoryPath.split('/').pop()];
-    
+
     if (!categoryId) {
       this.logger.warn(`Category not found in map: "${categoryPath}"`);
       this.logger.debug(`Available categories: ${Object.keys(this.categoryMap).join(', ')}`);
     }
-    
-    return categoryId ? [{ category_id: categoryId, position: 0 }] : [];
+
+    // Add specific category with position 1 (after All Products)
+    if (categoryId) {
+      links.push({ category_id: categoryId, position: 1 });
+    }
+
+    return links;
   }
   
   /**

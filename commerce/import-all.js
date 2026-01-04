@@ -3,17 +3,17 @@
 /**
  * Import All Data to Commerce
  * Orchestrates the complete import process in dependency order
- * 
+ *
  * Order:
  * 0. Stores (website, store group, store view, root category)
  * 1. Customer Groups (required for tier pricing)
  * 2. Product Attributes (required before products)
  * 3. Categories (required before products)
+ * 3.5. Shared Catalog Categories (assigns categories to public B2B catalog for ACO)
  * 4. Simple Products (with tier pricing)
  * 5. Product Images (optional, requires products)
- * 6. Bundle Products (requires simple products)
- * 7. Customer Attributes (required before customers with ACO context)
- * 8. Demo Customers (requires customer groups + customer attributes)
+ * 6. Customer Attributes (required before customers with ACO context)
+ * 7. Demo Customers (requires customer groups + customer attributes)
  */
 
 import ora from 'ora';
@@ -27,6 +27,7 @@ import { importStores } from './importers/stores.js';
 import { importCustomerGroups } from './importers/customer-groups.js';
 import { importAttributes } from './importers/attributes.js';
 import { importCategories } from './importers/categories.js';
+import { assignSharedCatalogCategories } from './importers/shared-catalog.js';
 import { importProducts } from './importers/products.js';
 import { importImages } from './importers/images.js';
 import { importCustomerAttributes } from './importers/customer-attributes.js';
@@ -185,6 +186,7 @@ async function importAll() {
     customerGroups: null,
     attributes: null,
     categories: null,
+    sharedCatalog: null,
     products: null,
     images: null,
     customerAttributes: null,
@@ -227,15 +229,26 @@ try {
     
     // Step 3: Categories
     const categoriesResult = await executeImportStep(
-      'categories', 
-      importCategories, 
-      { 
+      'categories',
+      importCategories,
+      {
         context: { rootCategoryId: storeIds.rootCategoryId }
       }
     );
     results.categories = categoriesResult;
     categoryMap = categoriesResult.categoryMap || {};
-    
+
+    // Step 3.5: Assign categories to public shared catalog (B2B)
+    // This ensures categories are visible in ACO Catalog Service
+    const sharedCatalogResult = await executeImportStep(
+      'shared catalog categories',
+      assignSharedCatalogCategories,
+      {
+        context: { categoryMap }
+      }
+    );
+    results.sharedCatalog = sharedCatalogResult;
+
     // Step 4: Simple Products
     // Resolve website ID if stores import didn't provide it
     let websiteIds = [];
