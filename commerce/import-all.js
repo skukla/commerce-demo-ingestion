@@ -14,6 +14,7 @@
  * 5. Product Images (optional, requires products)
  * 6. Customer Attributes (required before customers with ACO context)
  * 7. Demo Customers (requires customer groups + customer attributes)
+ * 8. B2B Companies (requires customers for company admin assignment)
  */
 
 import ora from 'ora';
@@ -32,6 +33,7 @@ import { importProducts } from './importers/products.js';
 import { importImages } from './importers/images.js';
 import { importCustomerAttributes } from './importers/customer-attributes.js';
 import { importCustomers } from './importers/customers.js';
+import { importCompanies } from './importers/companies.js';
 import { getStateTracker } from './lib/state-tracker.js';
 import { 
   runValidation,
@@ -327,7 +329,24 @@ try {
       );
       results.customers = customersResult;
     }
-    
+
+    // Step 8: B2B Companies (requires customers for admin assignment)
+    if (skipCustomers) {
+      updateLine('📦 Importing B2B companies...');
+      updateLine(chalk.green('✔ Importing B2B companies (skipped - customers skipped)'));
+      finishLine();
+      results.companies = { results: { skipped: true } };
+    } else {
+      const companiesResult = await executeImportStep(
+        'B2B companies',
+        importCompanies,
+        {
+          context: {}
+        }
+      );
+      results.companies = companiesResult;
+    }
+
   } catch (error) {
     console.log('');
     console.log(format.error(`Import process failed: ${error.message}`));

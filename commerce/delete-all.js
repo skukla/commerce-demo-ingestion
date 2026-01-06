@@ -251,6 +251,101 @@ async function deleteProjectCategories() {
 }
 
 /**
+ * Find B2B companies associated with project customers
+ */
+async function findProjectCompanies() {
+  try {
+    // Get all companies
+    const response = await commerceApi.get('/rest/V1/company/?searchCriteria[pageSize]=100');
+    const allCompanies = response.items || [];
+
+    // Load demo customer emails to match companies by super_user email
+    const { DEMO_CUSTOMERS } = await import('../shared/config-loader.js');
+    const demoEmails = new Set(DEMO_CUSTOMERS.map(c => c.email.toLowerCase()));
+
+    // Also check company names from demo data
+    const demoCompanyNames = new Set(
+      DEMO_CUSTOMERS
+        .filter(c => c.company)
+        .map(c => c.company.toLowerCase())
+    );
+
+    // Filter companies that match demo data
+    const projectCompanies = allCompanies.filter(company => {
+      // Match by company name
+      if (company.company_name && demoCompanyNames.has(company.company_name.toLowerCase())) {
+        return true;
+      }
+      // Match by super user email
+      if (company.super_user_id) {
+        // We'd need to look up the customer email, but for now just include all
+        // companies that aren't the default ones
+        return company.id > 3; // IDs 1-3 are typically system companies
+      }
+      return false;
+    });
+
+    logger.debug(`Found ${projectCompanies.length} project companies`);
+    return projectCompanies;
+  } catch (error) {
+    logger.debug(`Error finding companies: ${error.message}`);
+    return [];
+  }
+}
+
+/**
+ * Delete B2B companies (must be done before deleting company admin customers)
+ */
+async function deleteProjectCompanies() {
+  try {
+    const projectCompanies = await findProjectCompanies();
+
+    if (projectCompanies.length === 0) {
+      return { deleted: 0, failed: 0 };
+    }
+
+    let deleted = 0;
+    let failed = 0;
+    const failureDetails = [];
+
+    for (const company of projectCompanies) {
+      try {
+        if (isDryRun) {
+          deleted++;
+        } else {
+          await commerceApi.delete(`/rest/V1/company/${company.id}`);
+          deleted++;
+          logger.debug(`Deleted company: ${company.company_name} (ID: ${company.id})`);
+        }
+      } catch (error) {
+        if (error.message?.includes('404') || error.message?.includes('not found') || error.message?.includes('No such entity')) {
+          logger.debug(`Company ${company.company_name} already deleted`);
+          deleted++;
+        } else {
+          logger.debug(`  Failed to delete company ${company.company_name}: ${error.message}`);
+          failureDetails.push({ name: company.company_name, id: company.id, error: error.message });
+          failed++;
+        }
+      }
+    }
+
+    // Show failure details if any
+    if (failureDetails.length > 0 && failureDetails.length <= 5) {
+      console.log(chalk.yellow(`⚠ ${failureDetails.length} company deletion(s) failed:`));
+      failureDetails.forEach(({ name, id, error }) => {
+        console.log(chalk.yellow(`  • ${name} (ID: ${id}): ${error}`));
+      });
+    }
+
+    return { deleted, failed, failureDetails };
+
+  } catch (error) {
+    logger.debug(`Failed to delete companies: ${error.message}`);
+    return { deleted: 0, failed: 1 };
+  }
+}
+
+/**
  * Find project demo customers
  */
 async function findProjectCustomers() {
@@ -611,18 +706,27 @@ async function performDeletion(detector, options) {
     categories: { deleted: 0, failed: 0 },
     attributes: { deleted: 0, failed: 0, notFound: 0 },
     customerGroups: { deleted: 0, failed: 0, notFound: 0 },
+    companies: { deleted: 0, failed: 0 },
     customers: { deleted: 0, failed: 0 },
     customerAttributes: { deleted: 0, failed: 0, notFound: 0 },
     stores: { deleted: 0, failed: 0, notFound: 0 }
   };
-  
+
   // Find products (single line)
   const productResults = await detector.findAllProducts();
   const skus = productResults.skus;
-  
+
   // Deletion in reverse order of import (single line per step)
-  
-  // Step 8: Demo Customers
+
+  // Step 9: B2B Companies (MUST be deleted before company admin customers)
+  if (deleteCustomers) {
+    results.companies = await deleteProjectCompanies();
+    if (!silent && results.companies.deleted > 0) {
+      console.log(chalk.green(`✔ Deleted ${results.companies.deleted} B2B companies`));
+    }
+  }
+
+  // Step 8: Demo Customers (now possible after companies are deleted)
   if (deleteCustomers) {
     results.customers = await deleteProjectCustomers();
     if (!silent && results.customers.deleted > 0) {

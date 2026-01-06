@@ -367,8 +367,11 @@ export const commerceApi = {
     }
   },
   
-  async createCustomer(customer, password) {
-    return apiRequest('POST', '/rest/V1/customers', { customer, password });
+  async createCustomer(customer, password, storeCode = null) {
+    // IMPORTANT: Use store-scoped endpoint when creating customers for non-default websites
+    // Without store scope, passwords may not be set correctly for multi-website setups
+    const scope = storeCode || 'all';
+    return apiRequest('POST', `/rest/${scope}/V1/customers`, { customer, password });
   },
   
   async updateCustomer(customerId, customer) {
