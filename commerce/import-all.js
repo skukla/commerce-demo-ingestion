@@ -11,6 +11,7 @@
  * 3. Categories (required before products)
  * 3.5. Shared Catalog Categories (assigns categories to public B2B catalog for ACO)
  * 4. Simple Products (with tier pricing)
+ * 4.5. Shared Catalog Products (assigns products to public B2B catalog for guest add-to-cart)
  * 5. Product Images (optional, requires products)
  * 6. Customer Attributes (required before customers with ACO context)
  * 7. Demo Customers (requires customer groups + customer attributes)
@@ -28,7 +29,7 @@ import { importStores } from './importers/stores.js';
 import { importCustomerGroups } from './importers/customer-groups.js';
 import { importAttributes } from './importers/attributes.js';
 import { importCategories } from './importers/categories.js';
-import { assignSharedCatalogCategories } from './importers/shared-catalog.js';
+import { assignSharedCatalogCategories, assignSharedCatalogProducts } from './importers/shared-catalog.js';
 import { importProducts } from './importers/products.js';
 import { importImages } from './importers/images.js';
 import { importCustomerAttributes } from './importers/customer-attributes.js';
@@ -190,6 +191,7 @@ async function importAll() {
     categories: null,
     sharedCatalog: null,
     products: null,
+    sharedCatalogProducts: null,
     images: null,
     customerAttributes: null,
     customers: null
@@ -276,7 +278,21 @@ try {
     );
     results.products = productsResult;
     productSkuMap = productsResult.productSkuMap || {};
-    
+
+    // Step 4.5: Assign products to public shared catalog (B2B)
+    // This ensures products can be added to cart by guest users
+    // Without this, guests get "PERMISSION_DENIED" when adding to cart
+    if (Object.keys(productSkuMap).length > 0) {
+      const sharedCatalogProductsResult = await executeImportStep(
+        'shared catalog products',
+        assignSharedCatalogProducts,
+        {
+          context: { productSkuMap }
+        }
+      );
+      results.sharedCatalogProducts = sharedCatalogProductsResult;
+    }
+
     // Step 5: Product Images
     if (skipImages) {
       updateLine('📦 Importing product images...');

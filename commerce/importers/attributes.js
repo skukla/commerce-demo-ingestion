@@ -51,10 +51,15 @@ class AttributeImporter extends BaseImporter {
         this.results.addExisting({ code: attr.attribute_code });
         this.stateTracker.addAttribute(attr.attribute_code);
         // Build option map for product attribute dropdowns
+        // Use nested structure: attributeOptionMap[attr_code][option_label] = option_value
         if (existingAttr && existingAttr.options) {
+          if (!this.attributeOptionMap[existingAttr.attribute_code]) {
+            this.attributeOptionMap[existingAttr.attribute_code] = {};
+          }
           existingAttr.options.forEach(opt => {
-            const key = `${existingAttr.attribute_code}:${opt.label.toLowerCase()}`;
-            this.attributeOptionMap[key] = opt.value;
+            if (opt.label && opt.label.trim() && opt.value) {
+              this.attributeOptionMap[existingAttr.attribute_code][opt.label] = opt.value;
+            }
           });
         }
       },
